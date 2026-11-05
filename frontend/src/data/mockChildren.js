@@ -1,0 +1,166 @@
+/**
+ * Synthetic Demo Child Health Records
+ * Fictional data for demonstration of NavJyoti - No real patient data.
+ * 
+ * Priority Levels:
+ * - Red: Administrative urgent follow-up (>30 days overdue, zero-dose baseline)
+ * - Amber: Scheduled dose due soon (next 7-14 days) or migration record check requested
+ * - Green: All age-appropriate doses administered up to date
+ */
+export const INITIAL_CHILDREN = [
+  {
+    id: "NJ-2024-0891",
+    name: "Aarav Sharma",
+    dob: "2024-03-15",
+    gender: "Male",
+    ageMonths: 8,
+    caregiverId: "usr_parent_01",
+    caregiverName: "Sunita Sharma",
+    caregiverPhone: "+91 98765 43210",
+    village: "Rampur",
+    subCentre: "Rampur Sub-Centre",
+    phc: "Bilaspur Primary Health Centre",
+    priorityLevel: "amber", // Due soon for 9-month MR-1
+    migrationStatus: "resident",
+    qrToken: "tok_aarav_0891_sec",
+    doses: [
+      { id: "d1", vaccineId: "bcg", vaccineName: "BCG", status: "administered", dateAdministered: "2024-03-16", batch: "BCG-24B-91", facility: "Bilaspur PHC", workerName: "Rekha Devi (ANM)" },
+      { id: "d2", vaccineId: "opv_0", vaccineName: "OPV 0", status: "administered", dateAdministered: "2024-03-16", batch: "OPV-24-01", facility: "Bilaspur PHC", workerName: "Rekha Devi (ANM)" },
+      { id: "d3", vaccineId: "hepb_0", vaccineName: "Hepatitis B (Birth)", status: "administered", dateAdministered: "2024-03-16", batch: "HEP-24-99", facility: "Bilaspur PHC", workerName: "Rekha Devi (ANM)" },
+      { id: "d4", vaccineId: "penta_1", vaccineName: "Pentavalent 1", status: "administered", dateAdministered: "2024-04-28", batch: "PNT-24-11", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d5", vaccineId: "opv_1", vaccineName: "OPV 1", status: "administered", dateAdministered: "2024-04-28", batch: "OPV-24-44", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d6", vaccineId: "rota_1", vaccineName: "Rotavirus 1", status: "administered", dateAdministered: "2024-04-28", batch: "ROT-24-33", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d7", vaccineId: "fipv_1", vaccineName: "fIPV 1", status: "administered", dateAdministered: "2024-04-28", batch: "IPV-24-12", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d8", vaccineId: "pcv_1", vaccineName: "PCV 1", status: "administered", dateAdministered: "2024-04-28", batch: "PCV-24-78", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d9", vaccineId: "penta_2", vaccineName: "Pentavalent 2", status: "administered", dateAdministered: "2024-05-29", batch: "PNT-24-88", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d10", vaccineId: "opv_2", vaccineName: "OPV 2", status: "administered", dateAdministered: "2024-05-29", batch: "OPV-24-72", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d11", vaccineId: "rota_2", vaccineName: "Rotavirus 2", status: "administered", dateAdministered: "2024-05-29", batch: "ROT-24-91", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d12", vaccineId: "penta_3", vaccineName: "Pentavalent 3", status: "administered", dateAdministered: "2024-07-02", batch: "PNT-24-90", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d13", vaccineId: "opv_3", vaccineName: "OPV 3", status: "administered", dateAdministered: "2024-07-02", batch: "OPV-24-18", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d14", vaccineId: "rota_3", vaccineName: "Rotavirus 3", status: "administered", dateAdministered: "2024-07-02", batch: "ROT-24-45", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d15", vaccineId: "fipv_2", vaccineName: "fIPV 2", status: "administered", dateAdministered: "2024-07-02", batch: "IPV-24-81", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d16", vaccineId: "pcv_2", vaccineName: "PCV 2", status: "administered", dateAdministered: "2024-07-02", batch: "PCV-24-99", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "d17", vaccineId: "mr_1", vaccineName: "MR 1 (Measles-Rubella)", status: "due_soon", dueDate: "2024-12-15", facility: "Rampur SC" },
+      { id: "d18", vaccineId: "pcv_booster", vaccineName: "PCV Booster", status: "due_soon", dueDate: "2024-12-15", facility: "Rampur SC" },
+      { id: "d19", vaccineId: "vita_1", vaccineName: "Vitamin A (1st Dose)", status: "due_soon", dueDate: "2024-12-15", facility: "Rampur SC" },
+    ],
+    milestones: [
+      { id: "m1", milestoneId: "m_0_1", domain: "motor", status: "recorded", observedDate: "2024-04-10", notes: "Lifts head comfortably on tummy." },
+      { id: "m2", milestoneId: "m_0_3", domain: "social", status: "recorded", observedDate: "2024-04-15", notes: "Smiles actively at mother's voice." },
+      { id: "m3", milestoneId: "m_2_1", domain: "motor", status: "recorded", observedDate: "2024-06-01", notes: "Head steady when held upright." },
+      { id: "m4", milestoneId: "m_6_1", domain: "motor", status: "recorded", observedDate: "2024-09-20", notes: "Sits without assistance." },
+      { id: "m5", milestoneId: "m_6_3", domain: "language", status: "recorded", observedDate: "2024-10-05", notes: "Babbles 'da-da' and 'ba-ba'." },
+      { id: "m6", milestoneId: "m_6_4", domain: "social", status: "recorded", observedDate: "2024-10-18", notes: "Turns quickly when name called." },
+    ],
+  },
+  {
+    id: "NJ-2024-0412",
+    name: "Ananya Verma",
+    dob: "2024-06-20",
+    gender: "Female",
+    ageMonths: 4,
+    caregiverId: "usr_parent_02",
+    caregiverName: "Pooja Verma",
+    caregiverPhone: "+91 98112 34567",
+    village: "Kalyanpur",
+    subCentre: "Kalyanpur Sub-Centre",
+    phc: "Bilaspur Primary Health Centre",
+    priorityLevel: "red", // Overdue for 14-week Pentavalent-3 & OPV-3
+    migrationStatus: "migrant_in", // Recently arrived from construction site
+    qrToken: "tok_ananya_0412_sec",
+    doses: [
+      { id: "da1", vaccineId: "bcg", vaccineName: "BCG", status: "administered", dateAdministered: "2024-06-21", batch: "BCG-24B-10", facility: "District Hospital", workerName: "S. Lata" },
+      { id: "da2", vaccineId: "opv_0", vaccineName: "OPV 0", status: "administered", dateAdministered: "2024-06-21", batch: "OPV-24-02", facility: "District Hospital", workerName: "S. Lata" },
+      { id: "da3", vaccineId: "hepb_0", vaccineName: "Hepatitis B (Birth)", status: "administered", dateAdministered: "2024-06-21", batch: "HEP-24-33", facility: "District Hospital", workerName: "S. Lata" },
+      { id: "da4", vaccineId: "penta_1", vaccineName: "Pentavalent 1", status: "administered", dateAdministered: "2024-08-04", batch: "PNT-24-55", facility: "Transit Clinic", workerName: "K. Shanti" },
+      { id: "da5", vaccineId: "opv_1", vaccineName: "OPV 1", status: "administered", dateAdministered: "2024-08-04", batch: "OPV-24-91", facility: "Transit Clinic", workerName: "K. Shanti" },
+      { id: "da6", vaccineId: "penta_2", vaccineName: "Pentavalent 2", status: "overdue", dueDate: "2024-09-02", facility: "Kalyanpur SC" },
+      { id: "da7", vaccineId: "opv_2", vaccineName: "OPV 2", status: "overdue", dueDate: "2024-09-02", facility: "Kalyanpur SC" },
+    ],
+    milestones: [
+      { id: "ma1", milestoneId: "m_0_1", domain: "motor", status: "recorded", observedDate: "2024-07-15", notes: "Observed during birth check." },
+      { id: "ma2", milestoneId: "m_2_1", domain: "motor", status: "not_observed", observedDate: "2024-10-15", notes: "Caregiver reports head slightly unsteady." },
+    ],
+  },
+  {
+    id: "NJ-2023-1102",
+    name: "Vihaan Patel",
+    dob: "2023-10-10",
+    gender: "Male",
+    ageMonths: 13,
+    caregiverId: "usr_parent_03",
+    caregiverName: "Meera Patel",
+    caregiverPhone: "+91 97234 56789",
+    village: "Rampur",
+    subCentre: "Rampur Sub-Centre",
+    phc: "Bilaspur Primary Health Centre",
+    priorityLevel: "green", // All up to date for 13 months
+    migrationStatus: "resident",
+    qrToken: "tok_vihaan_1102_sec",
+    doses: [
+      { id: "dv1", vaccineId: "bcg", vaccineName: "BCG", status: "administered", dateAdministered: "2023-10-11", batch: "BCG-23-44", facility: "Bilaspur PHC", workerName: "Rekha Devi (ANM)" },
+      { id: "dv2", vaccineId: "opv_0", vaccineName: "OPV 0", status: "administered", dateAdministered: "2023-10-11", batch: "OPV-23-19", facility: "Bilaspur PHC", workerName: "Rekha Devi (ANM)" },
+      { id: "dv3", vaccineId: "penta_1", vaccineName: "Pentavalent 1", status: "administered", dateAdministered: "2023-11-24", batch: "PNT-23-66", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "dv4", vaccineId: "penta_2", vaccineName: "Pentavalent 2", status: "administered", dateAdministered: "2023-12-28", batch: "PNT-23-77", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "dv5", vaccineId: "penta_3", vaccineName: "Pentavalent 3", status: "administered", dateAdministered: "2024-01-30", batch: "PNT-24-02", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "dv6", vaccineId: "mr_1", vaccineName: "MR 1", status: "administered", dateAdministered: "2024-07-18", batch: "MR-24-30", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "dv7", vaccineId: "vita_1", vaccineName: "Vitamin A (1st Dose)", status: "administered", dateAdministered: "2024-07-18", batch: "VA-24-10", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "dv8", vaccineId: "mr_2", vaccineName: "MR 2", status: "upcoming", dueDate: "2025-02-10", facility: "Rampur SC" },
+    ],
+    milestones: [
+      { id: "mv1", milestoneId: "m_9_1", domain: "motor", status: "recorded", observedDate: "2024-08-01", notes: "Pulls up to standing well." },
+      { id: "mv2", milestoneId: "m_9_3", domain: "social", status: "recorded", observedDate: "2024-08-15", notes: "Waves goodbye enthusiastically." },
+      { id: "mv3", milestoneId: "m_12_1", domain: "motor", status: "recorded", observedDate: "2024-10-25", notes: "Walking independently across room." },
+    ],
+  },
+  {
+    id: "NJ-2024-0994",
+    name: "Priya Yadav",
+    dob: "2024-08-05",
+    gender: "Female",
+    ageMonths: 3,
+    caregiverId: "usr_parent_04",
+    caregiverName: "Radha Yadav",
+    caregiverPhone: "+91 96543 21098",
+    village: "Shivpur",
+    subCentre: "Shivpur Sub-Centre",
+    phc: "Bilaspur Primary Health Centre",
+    priorityLevel: "amber",
+    migrationStatus: "resident",
+    qrToken: "tok_priya_0994_sec",
+    doses: [
+      { id: "dp1", vaccineId: "bcg", vaccineName: "BCG", status: "administered", dateAdministered: "2024-08-06", batch: "BCG-24B-80", facility: "Shivpur SC", workerName: "ANM Nirmala" },
+      { id: "dp2", vaccineId: "penta_1", vaccineName: "Pentavalent 1", status: "administered", dateAdministered: "2024-09-20", batch: "PNT-24-95", facility: "Shivpur SC", workerName: "ANM Nirmala" },
+      { id: "dp3", vaccineId: "penta_2", vaccineName: "Pentavalent 2", status: "due_soon", dueDate: "2024-11-10", facility: "Shivpur SC" },
+    ],
+    milestones: [
+      { id: "mp1", milestoneId: "m_0_1", domain: "motor", status: "recorded", observedDate: "2024-09-01", notes: "Holds head up on tummy." },
+    ],
+  },
+  {
+    id: "NJ-2024-0120",
+    name: "Kabir Das",
+    dob: "2024-01-10",
+    gender: "Male",
+    ageMonths: 10,
+    caregiverId: "usr_parent_05",
+    caregiverName: "Lakshmi Das",
+    caregiverPhone: "+91 95432 10987",
+    village: "Rampur",
+    subCentre: "Rampur Sub-Centre",
+    phc: "Bilaspur Primary Health Centre",
+    priorityLevel: "red", // Missed 9-month MR-1
+    migrationStatus: "migrant_out", // Family moved to brick kiln area
+    qrToken: "tok_kabir_0120_sec",
+    doses: [
+      { id: "dk1", vaccineId: "bcg", vaccineName: "BCG", status: "administered", dateAdministered: "2024-01-11", batch: "BCG-24A-01", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "dk2", vaccineId: "penta_1", vaccineName: "Pentavalent 1", status: "administered", dateAdministered: "2024-02-25", batch: "PNT-24-08", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "dk3", vaccineId: "penta_2", vaccineName: "Pentavalent 2", status: "administered", dateAdministered: "2024-04-05", batch: "PNT-24-34", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "dk4", vaccineId: "penta_3", vaccineName: "Pentavalent 3", status: "administered", dateAdministered: "2024-05-18", batch: "PNT-24-60", facility: "Rampur SC", workerName: "Rekha Devi (ANM)" },
+      { id: "dk5", vaccineId: "mr_1", vaccineName: "MR 1", status: "overdue", dueDate: "2024-10-10", facility: "Rampur SC" },
+    ],
+    milestones: [
+      { id: "mk1", milestoneId: "m_6_1", domain: "motor", status: "needs_review", observedDate: "2024-08-10", notes: "Caregiver requested check on crawling stability." },
+    ],
+  },
+];
