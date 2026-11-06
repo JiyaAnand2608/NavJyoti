@@ -10,23 +10,23 @@ import {
   FileText,
   Calendar,
   ArrowRight,
-  ShieldCheck,
-  Baby,
-  BriefcaseMedical,
-  CheckCircle2,
-  Clock,
   User,
+  Users,
+  BriefcaseMedical,
+  Check,
+  CheckCircle2,
   ExternalLink,
   ChevronRight,
   ClipboardList,
   Bell,
-  HeartHandshake,
   Sprout,
-  FolderLock,
+  FolderPlus,
+  Headphones,
+  Plus,
 } from 'lucide-react';
 
 export function LandingPage() {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -39,138 +39,205 @@ export function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAFBF8] text-[#17394A]">
+    <div className="min-h-screen w-full flex flex-col bg-[#F5F1E9] text-[#294B57] overflow-x-hidden">
+      {/* 1. HEADER */}
       <Navbar />
 
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-12">
-        {/* 1. HERO SECTION — Matches Reference Visual Direction */}
-        <section className="relative overflow-hidden rounded-[28px] sm:rounded-[36px] bg-gradient-to-b from-[#EAF7F0] via-[#DCEFE5] to-[#D5EBDD] border border-[#CDE5D6] p-6 sm:p-10 lg:p-14 shadow-xs">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10">
-            {/* Left Column: Hero Content */}
-            <div className="lg:col-span-7 space-y-5 text-center lg:text-left">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#17394A] tracking-tight leading-[1.2] font-serif">
-                Your Child's Health Journey, Made Simple.
-              </h1>
+      {/* 2. HERO SECTION — Full-width landscape-inspired hero */}
+      <section className="relative w-full overflow-hidden bg-gradient-to-b from-[#F5F1E9] via-[#EBF4EE] to-[#E5F2E9] pt-6 sm:pt-10 pb-12 sm:pb-16 lg:pb-20">
+        {/* Full-width Responsive Landscape Waves & Sunrise SVG Background */}
+        <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden">
+          <svg
+            className="w-full h-full object-cover"
+            viewBox="0 0 1440 440"
+            fill="none"
+            preserveAspectRatio="none"
+          >
+            <defs>
+              <linearGradient id="hillGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#C7E4CD" stopOpacity="0.45" />
+                <stop offset="100%" stopColor="#A8D5B5" stopOpacity="0.65" />
+              </linearGradient>
+              <linearGradient id="hillGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#A8D5B5" stopOpacity="0.5" />
+                <stop offset="100%" stopColor="#89C49B" stopOpacity="0.7" />
+              </linearGradient>
+              <linearGradient id="sunGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#FDE68A" stopOpacity="0.9" />
+                <stop offset="100%" stopColor="#F4B83F" stopOpacity="0.95" />
+              </linearGradient>
+            </defs>
 
-              <p className="text-sm sm:text-base text-slate-600 max-w-xl mx-auto lg:mx-0 leading-relaxed">
-                Track vaccinations, follow developmental milestones and keep your child's health records organised — all in one convenient place.
+            {/* Back Wave / Hill */}
+            <path
+              d="M-50 320 C 280 230, 680 340, 1020 220 C 1220 150, 1380 180, 1500 200 L 1500 460 L -50 460 Z"
+              fill="url(#hillGrad1)"
+            />
+
+            {/* Rising Half Sun on the Upper Right */}
+            <g transform="translate(1160, 140)">
+              {/* Radial Dashed Sun Rays */}
+              <line x1="0" y1="-56" x2="0" y2="-72" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+              <line x1="28" y1="-50" x2="38" y2="-66" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+              <line x1="52" y1="-30" x2="68" y2="-40" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+              <line x1="64" y1="-6" x2="80" y2="-6" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+              <line x1="-28" y1="-50" x2="-38" y2="-66" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+              <line x1="-52" y1="-30" x2="-68" y2="-40" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+              <line x1="-64" y1="-6" x2="-80" y2="-6" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+
+              {/* Sun Semi-Circle */}
+              <path
+                d="M -54 0 A 54 54 0 0 1 54 0 Z"
+                fill="url(#sunGlow)"
+              />
+            </g>
+
+            {/* Foreground Wave / Hill */}
+            <path
+              d="M-50 360 C 320 270, 720 380, 1080 280 C 1260 230, 1400 270, 1500 280 L 1500 460 L -50 460 Z"
+              fill="url(#hillGrad2)"
+            />
+
+            {/* Bottom Gentle Wave Transition */}
+            <path
+              d="M-50 410 Q 400 370, 850 410 T 1500 400 L 1500 460 L -50 460 Z"
+              fill="#E5F2E9"
+              opacity="0.9"
+            />
+
+            {/* Decorative Leaves on Left Corner */}
+            <g transform="translate(18, 220) scale(0.9)" opacity="0.8">
+              <path d="M0 40 Q 25 15, 45 35 Q 25 55, 0 40 Z" fill="#84C499" />
+              <path d="M-10 10 Q 15 -15, 35 5 Q 15 25, -10 10 Z" fill="#71B587" />
+              <path d="M10 -20 Q 35 -40, 50 -15 Q 30 0, 10 -20 Z" fill="#84C499" />
+            </g>
+
+            {/* Center Decorative Leaf Plant Sprouting from Hills */}
+            <g transform="translate(670, 240) scale(0.95)" opacity="0.85">
+              <path d="M0 100 Q 5 50, 0 0" stroke="#5E9F76" strokeWidth="3" strokeLinecap="round" fill="none" />
+              <path d="M0 70 Q -25 55, -35 70 Q -20 85, 0 70 Z" fill="#6FB386" />
+              <path d="M0 50 Q 25 35, 35 50 Q 20 65, 0 50 Z" fill="#7CBD93" />
+              <path d="M0 30 Q -30 15, -40 30 Q -20 45, 0 30 Z" fill="#6FB386" />
+              <path d="M0 10 Q 25 -5, 35 10 Q 18 25, 0 10 Z" fill="#7CBD93" />
+              <path d="M0 0 Q -5 -25, 0 -35 Q 5 -25, 0 0 Z" fill="#5E9F76" />
+            </g>
+
+            {/* Decorative Leaves on Right Edge */}
+            <g transform="translate(1320, 220) scale(1.1)" opacity="0.85">
+              <path d="M80 80 Q 20 50, 10 90" stroke="#5E9F76" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+              <path d="M40 70 Q 15 45, 0 65 Q 20 80, 40 70 Z" fill="#6FB386" />
+              <path d="M55 60 Q 75 35, 95 50 Q 75 70, 55 60 Z" fill="#7CBD93" />
+              <path d="M25 78 Q 0 60, -15 80 Q 5 95, 25 78 Z" fill="#6FB386" />
+            </g>
+          </svg>
+        </div>
+
+        {/* Content Container */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
+            {/* LEFT COLUMN: Hero Headline & Action Buttons */}
+            <div className="lg:col-span-7 space-y-4 text-center lg:text-left">
+              <div>
+                <h1 className="text-3xl sm:text-4xl lg:text-[44px] font-bold text-[#103342] tracking-tight leading-[1.18] font-serif">
+                  {lang === 'hi' ? (
+                    t('hero.headline')
+                  ) : (
+                    <>
+                      Your Child's Health<br className="hidden sm:inline" /> Journey, Made Simple.
+                    </>
+                  )}
+                </h1>
+                {/* Thick small green accent bar under title */}
+                <div className="w-14 h-1.5 bg-[#007F68] rounded-full mt-3 mx-auto lg:mx-0"></div>
+              </div>
+
+              <p className="text-sm sm:text-base text-[#294B57] max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal">
+                {t('hero.description')}
               </p>
 
-              {/* Primary & Secondary Action Buttons */}
-              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5">
+              {/* Action Buttons Row */}
+              <div className="pt-3 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5">
                 <button
                   onClick={() => handleQuickAction('/parent/dashboard')}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-full bg-[#006B64] hover:bg-[#00544e] text-white font-semibold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3 rounded-full bg-[#007F68] hover:bg-[#005F52] text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
                 >
-                  <User className="w-4 h-4 text-white/90" />
-                  <span>Continue as Parent</span>
+                  <Users className="w-4 h-4 text-white/95" />
+                  <span>{t('hero.continueParent')}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
                 <button
                   onClick={() => navigate('/auth/login', { state: { role: 'worker', from: '/worker/dashboard' } })}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-full bg-white hover:bg-slate-50 text-[#17394A] border border-slate-200/90 font-semibold text-xs sm:text-sm shadow-2xs transition-all cursor-pointer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-[#FBF8F2] hover:bg-white text-[#007F68] border border-[#007F68] font-semibold text-xs sm:text-sm shadow-2xs hover:shadow-xs transition-all cursor-pointer"
                 >
-                  <BriefcaseMedical className="w-4 h-4 text-[#006B64]" />
-                  <span>Health Worker Login</span>
+                  <Plus className="w-3.5 h-3.5 text-[#007F68] stroke-[3]" />
+                  <BriefcaseMedical className="w-4 h-4 text-[#007F68]" />
+                  <span>{t('hero.workerLogin')}</span>
                 </button>
               </div>
 
-              {/* Sub-link */}
-              <div className="pt-1">
+              {/* Sub-link underneath buttons */}
+              <div className="pt-1.5">
+                <span className="text-xs text-[#294B57]">
+                  {t('hero.newHere') || 'New here?'}{' '}
+                </span>
                 <Link
                   to="/auth/register"
-                  className="text-xs text-slate-500 hover:text-[#006B64] font-medium transition-colors"
+                  className="text-xs font-semibold text-[#007F68] hover:text-[#005F52] underline transition-colors"
                 >
-                  New here? <span className="underline font-semibold text-[#006B64]">Create an account</span>
+                  {t('hero.createAccount') || 'Create an account'}
                 </Link>
               </div>
             </div>
 
-            {/* Right Column: Original Abstract Healthcare Landscape & Floating Checklist Card */}
+            {/* RIGHT COLUMN: Floating Tilted Checklist Panel */}
             <div className="lg:col-span-5 flex items-center justify-center relative">
-              <div className="relative w-full max-w-[420px] h-[300px] sm:h-[340px] flex items-center justify-center overflow-hidden rounded-2xl">
-                {/* SVG Abstract Soft Landscape Backdrop */}
-                <svg
-                  className="absolute inset-0 w-full h-full pointer-events-none"
-                  viewBox="0 0 500 380"
-                  fill="none"
-                  preserveAspectRatio="xMidYMid slice"
-                >
-                  {/* Subtle Sunrise Glow & Rays */}
-                  <g transform="translate(360, 100)">
-                    <circle cx="0" cy="0" r="38" fill="#F5C45E" />
-                    {/* Sun rays */}
-                    <line x1="0" y1="-50" x2="0" y2="-64" stroke="#F5C45E" strokeWidth="3" strokeLinecap="round" />
-                    <line x1="36" y1="-36" x2="48" y2="-48" stroke="#F5C45E" strokeWidth="3" strokeLinecap="round" />
-                    <line x1="-36" y1="-36" x2="-48" y2="-48" stroke="#F5C45E" strokeWidth="3" strokeLinecap="round" />
-                    <line x1="50" y1="0" x2="64" y2="0" stroke="#F5C45E" strokeWidth="3" strokeLinecap="round" />
-                    <line x1="-50" y1="0" x2="-64" y2="0" stroke="#F5C45E" strokeWidth="3" strokeLinecap="round" />
-                  </g>
-
-                  {/* Soft Background Hills */}
-                  <path
-                    d="M-40 280 Q 150 140, 360 210 T 540 200 L 540 400 L -40 400 Z"
-                    fill="#C9E6D8"
-                    opacity="0.8"
-                  />
-                  <path
-                    d="M-20 300 Q 180 200, 380 280 T 540 260 L 540 400 L -20 400 Z"
-                    fill="#BBDCCB"
-                    opacity="0.9"
-                  />
-
-                  {/* Subtle Botanical Leaf Shapes (Right & Left) */}
-                  <g transform="translate(420, 260) rotate(-15)">
-                    <path d="M0 0 Q 20 -40, 0 -70 Q -20 -40, 0 0 Z" fill="#78B89F" opacity="0.7" />
-                    <path d="M0 -30 Q 35 -60, 25 -95 Q 5 -75, 0 -30 Z" fill="#78B89F" opacity="0.6" />
-                    <path d="M0 -40 Q -35 -70, -25 -105 Q -5 -85, 0 -40 Z" fill="#78B89F" opacity="0.6" />
-                  </g>
-                  <g transform="translate(80, 290) rotate(20)">
-                    <path d="M0 0 Q 18 -35, 0 -60 Q -18 -35, 0 0 Z" fill="#88C2AA" opacity="0.6" />
-                    <path d="M0 -25 Q 30 -50, 20 -80 Q 5 -60, 0 -25 Z" fill="#88C2AA" opacity="0.5" />
-                  </g>
-                </svg>
-
-                {/* Floating White Healthcare Checklist Card (Matches Reference Card Exactly) */}
-                <div className="relative z-10 w-72 sm:w-80 rounded-2xl bg-white/95 backdrop-blur-md p-5 shadow-md border border-white/90 transform rotate-[-1deg] hover:rotate-0 transition-transform">
-                  <div className="space-y-3.5">
-                    {/* Row 1: Vaccinations */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#FAFBF8] border border-slate-100">
+              <div className="relative w-full max-w-[340px] sm:max-w-[360px] py-4">
+                {/* Floating Ivory Card with completed-state checkmarks */}
+                <div className="relative z-10 w-full rounded-2xl sm:rounded-3xl bg-[#FBF8F2] p-5 sm:p-6 shadow-[0_12px_32px_rgba(16,51,66,0.08),0_4px_12px_rgba(16,51,66,0.04)] border border-[#D8E6DA] transform rotate-[-2.5deg] hover:rotate-0 transition-transform duration-300">
+                  <div className="space-y-3">
+                    {/* Item 1: Vaccinations */}
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-[#D8E6DA]/70 shadow-2xs">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-[#EAF7F0] text-[#006B64] flex items-center justify-center shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-[#DDF0E3] text-[#007F68] flex items-center justify-center shrink-0">
                           <Syringe className="w-4 h-4" />
                         </div>
-                        <span className="font-bold text-xs text-[#17394A]">Vaccinations</span>
+                        <span className="font-bold text-xs sm:text-sm text-[#103342]">
+                          {t('hero.checklist.vaccinations') || 'Vaccinations'}
+                        </span>
                       </div>
-                      <div className="w-5 h-5 rounded-full bg-[#006B64] text-white flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="w-4 h-4" />
+                      <div className="w-6 h-6 rounded-full bg-[#007F68] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
                       </div>
                     </div>
 
-                    {/* Row 2: Milestones */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#FAFBF8] border border-slate-100">
+                    {/* Item 2: Growth & Milestones */}
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-[#D8E6DA]/70 shadow-2xs">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-[#EAF7F0] text-[#006B64] flex items-center justify-center shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-[#DDF0E3] text-[#007F68] flex items-center justify-center shrink-0">
                           <Activity className="w-4 h-4" />
                         </div>
-                        <span className="font-bold text-xs text-[#17394A]">Milestones</span>
+                        <span className="font-bold text-xs sm:text-sm text-[#103342]">
+                          {t('hero.checklist.growthMilestones') || 'Growth & Milestones'}
+                        </span>
                       </div>
-                      <div className="w-5 h-5 rounded-full bg-[#006B64] text-white flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="w-4 h-4" />
+                      <div className="w-6 h-6 rounded-full bg-[#007F68] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
                       </div>
                     </div>
 
-                    {/* Row 3: Health Records */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#FAFBF8] border border-slate-100">
+                    {/* Item 3: Health Records */}
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-[#D8E6DA]/70 shadow-2xs">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-[#EAF7F0] text-[#006B64] flex items-center justify-center shrink-0">
-                          <FileText className="w-4 h-4" />
+                        <div className="w-9 h-9 rounded-xl bg-[#DDF0E3] text-[#007F68] flex items-center justify-center shrink-0">
+                          <FolderPlus className="w-4 h-4" />
                         </div>
-                        <span className="font-bold text-xs text-[#17394A]">Health Records</span>
+                        <span className="font-bold text-xs sm:text-sm text-[#103342]">
+                          {t('hero.checklist.healthRecords') || 'Health Records'}
+                        </span>
                       </div>
-                      <div className="w-5 h-5 rounded-full bg-[#006B64] text-white flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="w-4 h-4" />
+                      <div className="w-6 h-6 rounded-full bg-[#007F68] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
                       </div>
                     </div>
                   </div>
@@ -178,179 +245,208 @@ export function LandingPage() {
               </div>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* 2. QUICK ACCESS SECTION ("What would you like to do?") */}
-        <section className="space-y-6 pt-2">
-          <h2 className="text-2xl sm:text-3xl font-bold text-[#17394A] font-serif">
-            What would you like to do?
+      {/* 3. MAIN CONTENT: Compact arrangement & clear hierarchy */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-10 sm:space-y-12">
+        {/* SECTION: Explore NavJyoti */}
+        <section className="space-y-4">
+          <h2 className="text-2xl sm:text-[28px] font-bold text-[#103342] font-serif tracking-tight">
+            {t('explore.heading') || 'Explore NavJyoti'}
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-            {/* Card 1: Vaccinations */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Vaccination Tracker */}
             <div
               onClick={() => handleQuickAction('/parent/vaccines')}
-              className="group p-4 sm:p-5 rounded-2xl bg-white border border-[#DCEFE5] hover:border-[#006B64]/50 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-3"
+              className="group p-4 rounded-2xl bg-[#FBF8F2] border border-[#D8E6DA] hover:border-[#007F68] hover:shadow-sm transition-all cursor-pointer flex items-center justify-between gap-3"
             >
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl bg-[#EAF7F0] text-[#006B64] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-[#DDF0E3] text-[#007F68] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                   <Syringe className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-[#17394A]">Vaccinations</h3>
-                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                    Check upcoming and completed doses.
+                  <h3 className="font-bold text-sm text-[#103342]">
+                    {t('explore.vaccinationTracker') || 'Vaccination Tracker'}
+                  </h3>
+                  <p className="text-xs text-[#294B57] leading-snug mt-0.5">
+                    {t('explore.vaccinationTrackerDesc') || 'Check upcoming and completed doses.'}
                   </p>
                 </div>
               </div>
-              <div className="w-7 h-7 rounded-full bg-[#EAF7F0] text-[#006B64] flex items-center justify-center shrink-0 group-hover:bg-[#006B64] group-hover:text-white transition-colors">
-                <ChevronRight className="w-4 h-4" />
+              <div className="w-7 h-7 rounded-full bg-[#DDF0E3] text-[#007F68] flex items-center justify-center shrink-0 group-hover:bg-[#007F68] group-hover:text-white transition-colors">
+                <ArrowRight className="w-3.5 h-3.5" />
               </div>
             </div>
 
-            {/* Card 2: Milestones */}
+            {/* Card 2: Child Development */}
             <div
               onClick={() => handleQuickAction('/parent/milestones')}
-              className="group p-4 sm:p-5 rounded-2xl bg-white border border-[#fbeccb] hover:border-[#F5C45E] hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-3"
+              className="group p-4 rounded-2xl bg-[#FBF8F2] border border-[#D8E6DA] hover:border-[#70A558] hover:shadow-sm transition-all cursor-pointer flex items-center justify-between gap-3"
             >
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl bg-[#fdf8ef] text-[#dfab3e] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-[#EAF5EC] text-[#558B2F] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                   <Sprout className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-[#17394A]">Milestones</h3>
-                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                    Follow your child's development.
+                  <h3 className="font-bold text-sm text-[#103342]">
+                    {t('explore.childDevelopment') || 'Child Development'}
+                  </h3>
+                  <p className="text-xs text-[#294B57] leading-snug mt-0.5">
+                    {t('explore.childDevelopmentDesc') || 'Track growth and key milestones.'}
                   </p>
                 </div>
               </div>
-              <div className="w-7 h-7 rounded-full bg-[#fdf8ef] text-[#dfab3e] flex items-center justify-center shrink-0 group-hover:bg-[#F5C45E] group-hover:text-[#17394A] transition-colors">
-                <ChevronRight className="w-4 h-4" />
+              <div className="w-7 h-7 rounded-full bg-[#EAF5EC] text-[#558B2F] flex items-center justify-center shrink-0 group-hover:bg-[#558B2F] group-hover:text-white transition-colors">
+                <ArrowRight className="w-3.5 h-3.5" />
               </div>
             </div>
 
             {/* Card 3: Health Records */}
             <div
               onClick={() => handleQuickAction('/parent/records')}
-              className="group p-4 sm:p-5 rounded-2xl bg-white border border-[#d4eaf0] hover:border-[#006B64]/50 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-3"
+              className="group p-4 rounded-2xl bg-[#FBF8F2] border border-[#D8E6DA] hover:border-[#007F68] hover:shadow-sm transition-all cursor-pointer flex items-center justify-between gap-3"
             >
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl bg-[#EAF5F8] text-[#17394A] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                  <FolderLock className="w-5 h-5 text-[#006B64]" />
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-[#DDF0E3] text-[#007F68] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <FolderPlus className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-[#17394A]">Health Records</h3>
-                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                    Access important child records.
+                  <h3 className="font-bold text-sm text-[#103342]">
+                    {t('explore.healthRecords') || 'Health Records'}
+                  </h3>
+                  <p className="text-xs text-[#294B57] leading-snug mt-0.5">
+                    {t('explore.healthRecordsDesc') || "Access and manage your child's reports."}
                   </p>
                 </div>
               </div>
-              <div className="w-7 h-7 rounded-full bg-[#EAF5F8] text-[#006B64] flex items-center justify-center shrink-0 group-hover:bg-[#006B64] group-hover:text-white transition-colors">
-                <ChevronRight className="w-4 h-4" />
+              <div className="w-7 h-7 rounded-full bg-[#DDF0E3] text-[#007F68] flex items-center justify-center shrink-0 group-hover:bg-[#007F68] group-hover:text-white transition-colors">
+                <ArrowRight className="w-3.5 h-3.5" />
               </div>
             </div>
 
             {/* Card 4: Appointments */}
             <div
               onClick={() => handleQuickAction('/parent/appointments')}
-              className="group p-4 sm:p-5 rounded-2xl bg-white border border-[#f9dbdb] hover:border-[#D98282] hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-3"
+              className="group p-4 rounded-2xl bg-[#FBF8F2] border border-[#f0d4d4] hover:border-[#D9534F] hover:shadow-sm transition-all cursor-pointer flex items-center justify-between gap-3"
             >
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl bg-[#fdf2f2] text-[#D98282] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-[#FDECEC] text-[#D9534F] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                   <Calendar className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-[#17394A]">Appointments</h3>
-                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                    Manage visits and reminders.
+                  <h3 className="font-bold text-sm text-[#103342]">
+                    {t('explore.appointments') || 'Appointments'}
+                  </h3>
+                  <p className="text-xs text-[#294B57] leading-snug mt-0.5">
+                    {t('explore.appointmentsDesc') || 'Book and manage health visits.'}
                   </p>
                 </div>
               </div>
-              <div className="w-7 h-7 rounded-full bg-[#fdf2f2] text-[#D98282] flex items-center justify-center shrink-0 group-hover:bg-[#D98282] group-hover:text-white transition-colors">
-                <ChevronRight className="w-4 h-4" />
+              <div className="w-7 h-7 rounded-full bg-[#FDECEC] text-[#D9534F] flex items-center justify-center shrink-0 group-hover:bg-[#D9534F] group-hover:text-white transition-colors">
+                <ArrowRight className="w-3.5 h-3.5" />
               </div>
             </div>
           </div>
         </section>
 
-        {/* 3. HOW NAVJYOTI WORKS */}
-        <section className="space-y-6 pt-2">
-          <h2 className="text-2xl sm:text-3xl font-bold text-[#17394A] font-serif">
-            How NavJyoti Works
+        {/* SECTION: How NavJyoti Works */}
+        <section className="space-y-4">
+          <h2 className="text-2xl sm:text-[28px] font-bold text-[#103342] font-serif tracking-tight">
+            {t('howItWorks.heading') || 'How NavJyoti Works'}
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 bg-transparent">
             {/* Step 1 */}
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-slate-100 shadow-2xs">
-              <div className="w-12 h-12 rounded-full bg-[#EAF7F0] text-[#006B64] flex items-center justify-center shrink-0 font-bold">
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="w-12 h-12 rounded-full bg-[#DDF0E3] border border-[#C7E4CD] text-[#007F68] flex items-center justify-center shrink-0">
                 <User className="w-5 h-5" />
               </div>
-              <div>
-                <span className="font-bold text-xs text-[#17394A] block">
-                  1. Create or link your child's profile
-                </span>
-                <span className="text-[11px] text-slate-500">Quick sign-in with your mobile number</span>
-              </div>
+              <span className="font-bold text-xs sm:text-sm text-[#103342]">
+                {t('howItWorks.step1') || "1. Create your child's profile"}
+              </span>
+            </div>
+
+            {/* Dotted Line 1 */}
+            <div className="hidden md:flex flex-1 items-center justify-center px-4">
+              <div className="w-full border-t-2 border-dotted border-[#A8D5B5]"></div>
             </div>
 
             {/* Step 2 */}
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-slate-100 shadow-2xs">
-              <div className="w-12 h-12 rounded-full bg-[#EAF5F8] text-[#006B64] flex items-center justify-center shrink-0 font-bold">
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="w-12 h-12 rounded-full bg-[#DDF0E3] border border-[#C7E4CD] text-[#007F68] flex items-center justify-center shrink-0">
                 <ClipboardList className="w-5 h-5" />
               </div>
-              <div>
-                <span className="font-bold text-xs text-[#17394A] block">
-                  2. Track vaccinations and milestones
-                </span>
-                <span className="text-[11px] text-slate-500">Official UIP schedule and observations</span>
-              </div>
+              <span className="font-bold text-xs sm:text-sm text-[#103342]">
+                {t('howItWorks.step2') || '2. Track vaccinations and development'}
+              </span>
+            </div>
+
+            {/* Dotted Line 2 */}
+            <div className="hidden md:flex flex-1 items-center justify-center px-4">
+              <div className="w-full border-t-2 border-dotted border-[#A8D5B5]"></div>
             </div>
 
             {/* Step 3 */}
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-slate-100 shadow-2xs">
-              <div className="w-12 h-12 rounded-full bg-[#fdf8ef] text-[#dfab3e] flex items-center justify-center shrink-0 font-bold">
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="w-12 h-12 rounded-full bg-[#EAF5EC] border border-[#C7E4CD] text-[#70A558] flex items-center justify-center shrink-0">
                 <Bell className="w-5 h-5" />
               </div>
-              <div>
-                <span className="font-bold text-xs text-[#17394A] block">
-                  3. Receive reminders and coordinate visits
-                </span>
-                <span className="text-[11px] text-slate-500">Stay informed with ANM home support</span>
-              </div>
+              <span className="font-bold text-xs sm:text-sm text-[#103342]">
+                {t('howItWorks.step3') || '3. Get timely reminders and manage visits'}
+              </span>
             </div>
           </div>
         </section>
 
-        {/* 4. SUPPORT BANNER — Matches Reference Sage Green Banner */}
-        <section className="rounded-2xl sm:rounded-3xl bg-[#DCEFE5] border border-[#CDE5D6] p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-1 text-center md:text-left">
-            <h3 className="text-base sm:text-lg font-bold text-[#17394A]">
-              Need help with your child's health records?
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-600">
-              Find answers, get guidance or connect with your health worker.
-            </p>
+        {/* SECTION: Help Banner */}
+        <section className="relative rounded-2xl sm:rounded-3xl bg-[#DDF0E3]/70 border border-[#D8E6DA] p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden">
+          {/* Decorative Leaf Sprig on right corner of the banner */}
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none opacity-40 hidden sm:block">
+            <svg width="120" height="120" viewBox="0 0 100 100" fill="none">
+              <path d="M90 50 Q 50 30, 30 70" stroke="#007F68" strokeWidth="2.5" fill="none" />
+              <path d="M50 45 Q 30 25, 20 40 Q 35 55, 50 45 Z" fill="#A8D5B5" />
+              <path d="M65 40 Q 75 20, 85 30 Q 75 50, 65 40 Z" fill="#007F68" />
+              <path d="M40 55 Q 20 45, 10 60 Q 25 70, 40 55 Z" fill="#A8D5B5" />
+            </svg>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3">
+          <div className="flex items-center gap-4 text-center md:text-left relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-white border border-[#D8E6DA] text-[#007F68] flex items-center justify-center shrink-0 shadow-2xs">
+              <Headphones className="w-6 h-6 text-[#007F68]" />
+            </div>
+            <div className="space-y-0.5">
+              <h3 className="text-base sm:text-lg font-bold text-[#103342]">
+                {t('helpBanner.heading') || "Need help with your child's health journey?"}
+              </h3>
+              <p className="text-xs sm:text-sm text-[#294B57]">
+                {t('helpBanner.description') || 'Get guidance, find answers or connect with your health worker.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 relative z-10 shrink-0">
             <Link
               to="/parent/help"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white hover:bg-slate-50 text-[#17394A] font-semibold text-xs border border-slate-200 shadow-2xs transition-all"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white hover:bg-[#FBF8F2] text-[#103342] font-semibold text-xs border border-[#D8E6DA] shadow-2xs hover:shadow-xs transition-all"
             >
-              <span>Visit Help Centre</span>
-              <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+              <span>{t('helpBanner.visitHelp') || 'Visit Help Centre'}</span>
+              <ExternalLink className="w-3.5 h-3.5 text-[#294B57]" />
             </Link>
 
             <Link
               to="/parent/appointments"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#006B64] hover:bg-[#00544e] text-white font-semibold text-xs shadow-xs transition-all"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#007F68] hover:bg-[#005F52] text-white font-semibold text-xs shadow-xs hover:shadow transition-all"
             >
-              <span>Contact Your Health Worker</span>
+              <Users className="w-3.5 h-3.5 text-white/90" />
+              <span>{t('helpBanner.contactWorker') || 'Contact Your Health Worker'}</span>
             </Link>
           </div>
         </section>
       </main>
 
+      {/* 4. FOOTER */}
       <Footer />
     </div>
   );

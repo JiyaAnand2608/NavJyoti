@@ -11,13 +11,13 @@ export function Badge({ children, variant = 'default', size = 'md', className = 
   };
 
   const variants = {
-    default: "bg-[#EAF5F8] text-[#17394A] border border-[#d5e5f0]",
-    upToDate: "bg-[#E8F3EE] text-[#00524c] border border-[#00524c]/30",
-    dueSoon: "bg-[#fdf8ef] text-[#dca948] border border-[#F5C45E]/40",
-    overdue: "bg-[#fdf2f1] text-[#D9847D] border border-[#D9847D]/40",
-    simulated: "bg-amber-50 text-amber-800 border border-amber-300 font-semibold",
-    teal: "bg-[#00524c]/10 text-[#00524c] border border-[#00524c]/20",
-    navy: "bg-[#17394A] text-white",
+    default: "bg-[#DDF0E3] text-[#103342] border border-[#D8E6DA]",
+    upToDate: "bg-[#DDF0E3] text-[#007F68] border border-[#007F68]/30 font-semibold",
+    dueSoon: "bg-[#FDF8EF] text-[#B87D14] border border-[#F4B83F]/50 font-semibold",
+    overdue: "bg-[#FDECEC] text-[#D9534F] border border-[#E57373]/50 font-semibold",
+    simulated: "bg-[#F0EBE1] text-[#103342] border border-[#D8E6DA] font-semibold",
+    teal: "bg-[#DDF0E3] text-[#007F68] border border-[#007F68]/30 font-semibold",
+    navy: "bg-[#103342] text-white",
   };
 
   return (

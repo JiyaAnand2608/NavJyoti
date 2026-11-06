@@ -1,21 +1,14 @@
 import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useHealthData } from '../../contexts/HealthDataContext';
-import { Card, CardHeader, CardBody } from '../../components/common/Card';
+import { Card, CardHeader } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import {
   ArrowLeft,
   Syringe,
-  Activity,
-  CalendarCheck,
   CheckCircle2,
   Clock,
-  AlertTriangle,
-  FileText,
-  User,
-  PlusCircle,
-  Building,
 } from 'lucide-react';
 
 export function ChildDetailPage() {
@@ -32,7 +25,7 @@ export function ChildDetailPage() {
   const child = childrenList.find((c) => c.id === id) || childrenList[0];
 
   if (!child) {
-    return <div className="p-8 text-center text-slate-500">Child record not found.</div>;
+    return <div className="p-8 text-center text-[#294B57]">Child record not found.</div>;
   }
 
   const handleOpenAdminister = (dose) => {
@@ -54,36 +47,36 @@ export function ChildDetailPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto text-[#294B57]">
       {/* Top Breadcrumb */}
       <div>
         <Link
           to="/worker/registry"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-[#17394A] mb-3"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#103342] hover:text-[#007F68] mb-3"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Child Registry</span>
         </Link>
 
         {/* Child Header Card */}
-        <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="p-6 rounded-3xl bg-[#FBF8F2] border border-[#D8E6DA] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#EAF5F8] text-[#006B64] flex items-center justify-center font-bold text-xl">
+            <div className="w-14 h-14 rounded-2xl bg-[#DDF0E3] text-[#007F68] flex items-center justify-center font-bold text-xl">
               {child.name[0]}
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-[#17394A] font-serif">{child.name}</h1>
+                <h1 className="text-2xl font-bold text-[#103342] font-serif">{child.name}</h1>
                 {child.priorityLevel === 'red' && <Badge variant="overdue">Red Priority (Urgent)</Badge>}
                 {child.priorityLevel === 'amber' && <Badge variant="dueSoon">Amber (Due Soon)</Badge>}
                 {child.priorityLevel === 'green' && <Badge variant="upToDate">Green (Up to Date)</Badge>}
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                ID: <span className="font-mono font-semibold text-slate-700">{child.id}</span> • {child.ageMonths} Months ({child.gender}) • DOB: {child.dob}
+              <p className="text-xs text-[#294B57] mt-1">
+                ID: <span className="font-mono font-semibold text-[#007F68]">{child.id}</span> • {child.ageMonths} Months ({child.gender}) • DOB: {child.dob}
               </p>
-              <div className="mt-2 text-xs text-slate-600 flex flex-wrap items-center gap-4">
-                <span>Caregiver: <strong>{child.caregiverName}</strong> ({child.caregiverPhone})</span>
-                <span>Village: <strong>{child.village}</strong> ({child.subCentre})</span>
+              <div className="mt-2 text-xs text-[#294B57] flex flex-wrap items-center gap-4">
+                <span>Caregiver: <strong className="text-[#103342]">{child.caregiverName}</strong> ({child.caregiverPhone})</span>
+                <span>Village: <strong className="text-[#103342]">{child.village}</strong> ({child.subCentre})</span>
               </div>
             </div>
           </div>
@@ -91,13 +84,13 @@ export function ChildDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 text-xs font-semibold">
+      <div className="flex items-center gap-2 border-b border-[#D8E6DA] text-xs font-semibold">
         <button
           onClick={() => setActiveTab('doses')}
           className={`py-3 px-4 border-b-2 transition-all cursor-pointer ${
             activeTab === 'doses'
-              ? 'border-[#006B64] text-[#006B64]'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
+              ? 'border-[#007F68] text-[#007F68]'
+              : 'border-transparent text-[#294B57] hover:text-[#103342]'
           }`}
         >
           Clinical Vaccination Records ({child.doses?.length || 0})
@@ -106,8 +99,8 @@ export function ChildDetailPage() {
           onClick={() => setActiveTab('milestones')}
           className={`py-3 px-4 border-b-2 transition-all cursor-pointer ${
             activeTab === 'milestones'
-              ? 'border-[#006B64] text-[#006B64]'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
+              ? 'border-[#007F68] text-[#007F68]'
+              : 'border-transparent text-[#294B57] hover:text-[#103342]'
           }`}
         >
           Milestone Observations ({child.milestones?.length || 0})
@@ -116,25 +109,25 @@ export function ChildDetailPage() {
 
       {/* Doses Tab Content */}
       {activeTab === 'doses' && (
-        <Card>
+        <Card className="bg-[#FBF8F2] border-[#D8E6DA]">
           <CardHeader
             title="UIP Immunisation History & Due Queue"
             subtitle="Authorised ANM Administration Interface"
           />
-          <div className="divide-y divide-slate-100 text-xs">
+          <div className="divide-y divide-[#D8E6DA]/70 text-xs">
             {child.doses?.map((dose) => {
               const isDone = dose.status === 'administered';
               return (
-                <div key={dose.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60">
+                <div key={dose.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#F0EBE1]/40">
                   <div className="flex items-start gap-3">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
-                      isDone ? 'bg-[#EAF7F0] text-[#00524c]' : 'bg-[#fef7e8] text-[#dc9a23]'
+                      isDone ? 'bg-[#DDF0E3] text-[#007F68]' : 'bg-[#FDF8EF] text-[#B87D14]'
                     }`}>
                       {isDone ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                     </div>
                     <div>
-                      <span className="font-bold text-sm text-[#17394A]">{dose.vaccineName}</span>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <span className="font-bold text-sm text-[#103342]">{dose.vaccineName}</span>
+                      <p className="text-[11px] text-[#294B57] mt-0.5">
                         {isDone
                           ? `Administered: ${dose.dateAdministered} • Batch: ${dose.batch} • Recorded by ${dose.workerName}`
                           : `Scheduled Due: ${dose.dueDate || 'Immediate catch-up'}`}
@@ -152,7 +145,7 @@ export function ChildDetailPage() {
                         </Badge>
                         <button
                           onClick={() => handleOpenAdminister(dose)}
-                          className="px-3 py-1.5 rounded-lg bg-[#006B64] text-white font-semibold text-xs hover:bg-[#00524c] transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                          className="px-3 py-1.5 rounded-full bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                         >
                           <Syringe className="w-3.5 h-3.5" />
                           <span>Administer Dose</span>
@@ -169,25 +162,25 @@ export function ChildDetailPage() {
 
       {/* Milestones Tab Content */}
       {activeTab === 'milestones' && (
-        <Card>
+        <Card className="bg-[#FBF8F2] border-[#D8E6DA]">
           <CardHeader
             title="Frontline Observational Developmental Checkpoints"
             subtitle="Observational indicators for early growth tracking"
           />
-          <div className="p-4 space-y-3 text-xs">
+          <div className="p-4 space-y-3 text-xs text-[#294B57]">
             {child.milestones && child.milestones.length > 0 ? (
               child.milestones.map((m) => (
-                <div key={m.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div key={m.id} className="p-3 rounded-xl bg-white border border-[#D8E6DA]">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="font-bold text-[#17394A] capitalize">{m.domain} Milestone</span>
+                    <span className="font-bold text-[#103342] capitalize">{m.domain} Milestone</span>
                     <Badge variant={m.status === 'recorded' ? 'upToDate' : 'overdue'}>{m.status}</Badge>
                   </div>
-                  <p className="text-slate-600">{m.notes}</p>
-                  <span className="text-[10px] text-slate-400 block mt-1">Observed: {m.observedDate}</span>
+                  <p className="text-[#294B57]">{m.notes}</p>
+                  <span className="text-[10px] text-[#294B57]/70 block mt-1">Observed: {m.observedDate}</span>
                 </div>
               ))
             ) : (
-              <p className="text-slate-500 text-center py-6">No specific milestone observations logged yet for this child.</p>
+              <p className="text-[#294B57]/70 text-center py-6">No specific milestone observations logged yet for this child.</p>
             )}
           </div>
         </Card>
@@ -201,39 +194,39 @@ export function ChildDetailPage() {
           title={`Record Dose Administration: ${targetVaccine.vaccineName}`}
           subtitle={`Child: ${child.name} (${child.id})`}
         >
-          <form onSubmit={handleConfirmAdminister} className="space-y-4 text-xs">
+          <form onSubmit={handleConfirmAdminister} className="space-y-4 text-xs text-[#294B57]">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Vaccine Batch ID</label>
+              <label className="block font-semibold text-[#103342] mb-1">Vaccine Batch ID</label>
               <input
                 type="text"
                 required
                 value={batchNumber}
                 onChange={(e) => setBatchNumber(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono"
+                className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] font-mono"
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Healthcare Facility</label>
+              <label className="block font-semibold text-[#103342] mb-1">Healthcare Facility</label>
               <input
                 type="text"
                 required
                 value={facility}
                 onChange={(e) => setFacility(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Administering Health Worker</label>
+              <label className="block font-semibold text-[#103342] mb-1">Administering Health Worker</label>
               <input
                 type="text"
                 disabled
                 value="Rekha Devi (ANM - Rampur Sub-Centre)"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-600"
+                className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-[#F0EBE1] text-[#294B57]"
               />
             </div>
             <button
               type="submit"
-              className="w-full py-2.5 rounded-xl bg-[#006B64] text-white font-semibold text-xs hover:bg-[#00524c] transition-all cursor-pointer mt-2"
+              className="w-full py-2.5 rounded-full bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] transition-all cursor-pointer mt-2 shadow-xs"
             >
               Sign & Officially Record Dose
             </button>

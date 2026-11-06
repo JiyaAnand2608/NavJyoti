@@ -55,10 +55,10 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFBF8] flex flex-col justify-between p-4 sm:p-6 lg:p-8 text-[#17394A]">
+    <div className="min-h-screen bg-[#F5F1E9] flex flex-col justify-between p-4 sm:p-6 lg:p-8 text-[#294B57]">
       {/* Top Header */}
       <div className="max-w-md mx-auto w-full flex items-center justify-between">
-        <Link to="/auth/login" className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-[#006B64]">
+        <Link to="/auth/login" className="flex items-center gap-1.5 text-xs font-semibold text-[#103342] hover:text-[#007F68]">
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Login</span>
         </Link>
@@ -67,14 +67,14 @@ export function RegisterPage() {
 
       {/* Main Container */}
       <div className="max-w-md mx-auto w-full my-auto py-6">
-        <div className="bg-white rounded-[28px] border border-[#DCEFE5] p-6 sm:p-8 shadow-xs relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#DCEFE5] via-[#006B64] to-[#F5C45E]" />
+        <div className="bg-[#FBF8F2] rounded-[28px] border border-[#D8E6DA] p-6 sm:p-8 shadow-xs relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#A8D5B5] via-[#007F68] to-[#F4B83F]" />
 
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-[#17394A] font-serif">
+            <h1 className="text-2xl font-bold text-[#103342] font-serif">
               {t('auth.createAccountTitle')}
             </h1>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-[#294B57] mt-1">
               {t('auth.createAccountSubtitle')}
             </p>
           </div>
@@ -94,7 +94,7 @@ export function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             {/* Caregiver Name */}
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">
+              <label className="block font-semibold text-[#103342] mb-1">
                 {t('auth.fullName')}
               </label>
               <input
@@ -103,13 +103,13 @@ export function RegisterPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Geeta Devi"
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#006B64]"
+                className="w-full px-3 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#007F68]"
               />
             </div>
 
             {/* Mobile Number */}
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">
+              <label className="block font-semibold text-[#103342] mb-1">
                 {t('auth.phoneOrId')}
               </label>
               <input
@@ -118,13 +118,13 @@ export function RegisterPage() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+91 98XXX XXXXX"
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#006B64]"
+                className="w-full px-3 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#007F68]"
               />
             </div>
 
             {/* Language Preference */}
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">
+              <label className="block font-semibold text-[#103342] mb-1">
                 {t('auth.preferredLanguage')}
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -133,8 +133,8 @@ export function RegisterPage() {
                   onClick={() => setSelectedLanguage('en')}
                   className={`py-2 rounded-xl border font-semibold text-xs transition-all cursor-pointer ${
                     selectedLanguage === 'en'
-                      ? 'bg-[#EAF7F0] border-[#006B64] text-[#006B64]'
-                      : 'border-slate-200 text-slate-600'
+                      ? 'bg-[#DDF0E3] border-[#007F68] text-[#007F68]'
+                      : 'border-[#D8E6DA] text-[#294B57] bg-white'
                   }`}
                 >
                   English
@@ -144,8 +144,8 @@ export function RegisterPage() {
                   onClick={() => setSelectedLanguage('hi')}
                   className={`py-2 rounded-xl border font-semibold text-xs transition-all cursor-pointer ${
                     selectedLanguage === 'hi'
-                      ? 'bg-[#EAF7F0] border-[#006B64] text-[#006B64]'
-                      : 'border-slate-200 text-slate-600'
+                      ? 'bg-[#DDF0E3] border-[#007F68] text-[#007F68]'
+                      : 'border-[#D8E6DA] text-[#294B57] bg-white'
                   }`}
                 >
                   हिंदी (Hindi)
@@ -160,9 +160,9 @@ export function RegisterPage() {
                   type="checkbox"
                   checked={consent}
                   onChange={(e) => setConsent(e.target.checked)}
-                  className="mt-0.5 rounded text-[#006B64] focus:ring-[#006B64]"
+                  className="mt-0.5 rounded text-[#007F68] focus:ring-[#007F68]"
                 />
-                <span className="text-[11px] text-slate-600 leading-relaxed">
+                <span className="text-[11px] text-[#294B57] leading-relaxed">
                   {t('auth.consentText')}
                 </span>
               </label>
@@ -171,23 +171,23 @@ export function RegisterPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 rounded-full bg-[#006B64] text-white font-semibold text-xs hover:bg-[#00544e] transition-all shadow-xs cursor-pointer mt-2 disabled:opacity-50"
+              className="w-full py-2.5 rounded-full bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] transition-all shadow-xs cursor-pointer mt-2 disabled:opacity-50"
             >
               {isSubmitting ? "Creating Account..." : t('auth.createAccountBtn')}
             </button>
           </form>
 
-          <div className="mt-5 text-center text-xs text-slate-500">
+          <div className="mt-5 text-center text-xs text-[#294B57]">
             {t('auth.haveAccount')}{' '}
-            <Link to="/auth/login" className="font-semibold text-[#006B64] underline hover:text-[#00544e]">
+            <Link to="/auth/login" className="font-semibold text-[#007F68] underline hover:text-[#005F52]">
               {t('auth.signInHere')}
             </Link>
           </div>
         </div>
       </div>
 
-      <div className="text-center text-[11px] text-slate-400 py-2">
-        NavJyoti Healthcare Prototype • BIOS Hackathon Challenge 03
+      <div className="text-center text-[11px] text-[#294B57]/70 py-2">
+        NavJyoti Healthcare Platform • Healthy Children, Brighter Tomorrows
       </div>
     </div>
   );

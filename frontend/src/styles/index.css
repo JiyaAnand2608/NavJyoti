@@ -1,70 +1,127 @@
 @import "tailwindcss";
 
+:root {
+  /* NavJyoti Design Tokens */
+  --color-main-bg: #F5F1E9;
+  --color-secondary-bg: #F0EBE1;
+  --color-card-bg: #FBF8F2;
+  --color-hero-start: #F5F1E9;
+  --color-hero-end: #E5F2E9;
+  --color-primary-green: #007F68;
+  --color-dark-teal: #005F52;
+  --color-sage-green: #A8D5B5;
+  --color-light-mint: #DDF0E3;
+  --color-decorative-pale-green: #C7E4CD;
+  --color-dark-heading: #103342;
+  --color-body-text: #294B57;
+  --color-border: #D8E6DA;
+  --color-accent-yellow: #F4B83F;
+
+  /* Additional functional shades */
+  --color-coral: #E57373;
+  --color-coral-light: #FDECEC;
+}
+
 @theme {
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Playfair Display', Georgia, Cambria, 'Times New Roman', serif;
 
-  /* Final Refined Theme (Section 3) */
-  --color-primary-teal: #006B64;
-  --color-primary-teal-dark: #00544e;
-  --color-primary-teal-light: #00877e;
+  /* Theme tokens */
+  --color-cream: #F5F1E9;
+  --color-cream-deep: #F0EBE1;
+  --color-ivory: #FBF8F2;
 
-  --color-navy: #17394A;
-  --color-navy-dark: #0e2430;
-  --color-navy-light: #214f66;
+  --color-primary-green: #007F68;
+  --color-primary-teal: #007F68;
+  --color-primary-teal-dark: #005F52;
+  --color-primary-teal-light: #00967d;
 
-  --color-sage: #DCEFE5;
-  --color-sage-dark: #c8e3d4;
-  --color-sage-light: #eaf7f0;
+  --color-dark-teal: #005F52;
+  --color-sage: #A8D5B5;
+  --color-sage-green: #A8D5B5;
+  --color-sage-light: #C7E4CD;
+  --color-pale-green: #C7E4CD;
 
-  --color-mint: #EAF7F0;
-  --color-mint-dark: #d5eedf;
+  --color-mint: #DDF0E3;
+  --color-light-mint: #DDF0E3;
 
-  --color-ivory: #FAFBF8;
-  --color-ivory-dark: #efefe8;
+  --color-navy: #103342;
+  --color-dark-heading: #103342;
+  --color-body: #294B57;
+  --color-body-text: #294B57;
 
-  --color-pale-blue: #EAF5F8;
-  --color-pale-blue-dark: #d4eaf0;
+  --color-border-subtle: #D8E6DA;
+  --color-gold: #F4B83F;
+  --color-accent-yellow: #F4B83F;
 
-  --color-gold: #F5C45E;
-  --color-gold-dark: #dfab3e;
-  --color-gold-light: #fdecc3;
-
-  --color-coral: #D98282;
-  --color-coral-dark: #c46868;
-  --color-coral-surface: #fdf2f2;
+  --color-coral: #E57373;
+  --color-coral-surface: #FDECEC;
 }
 
 @layer base {
-  body {
-    font-family: var(--font-sans);
-    background-color: var(--color-ivory);
-    color: var(--color-navy);
+  *, ::before, ::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    width: 100%;
+    min-height: 100%;
     margin: 0;
     padding: 0;
+    background-color: var(--color-main-bg);
+    color: var(--color-body-text);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-sans);
+    background-color: var(--color-main-bg);
+    color: var(--color-body-text);
+    overflow-x: hidden;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  h1, h2, h3, h4, .font-heading {
+    color: var(--color-dark-heading);
   }
 }
 
 /* Custom scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f3ed;
+  background: #F0EBE1;
 }
 ::-webkit-scrollbar-thumb {
-  background: #c3cfc7;
+  background: #C7E4CD;
   border-radius: 9999px;
+  border: 1px solid #F0EBE1;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ab3a3;
+  background: #A8D5B5;
 }
 
 /* Glass & Card helpers */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(220, 239, 229, 0.8);
+  background: rgba(251, 248, 242, 0.94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(216, 230, 218, 0.9);
+}
+
+.card-ivory {
+  background-color: #FBF8F2;
+  border: 1px solid #D8E6DA;
 }

@@ -9,10 +9,10 @@ export function ProtectedRoute({ allowedRoles = [] }) {
   // Prevent flash while restoring session from storage
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAFBF8] text-[#17394A]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F1E9] text-[#103342]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-[#00524c] border-t-transparent animate-spin" />
-          <span className="text-xs font-semibold text-slate-500">Restoring NavJyoti session...</span>
+          <div className="w-8 h-8 rounded-full border-2 border-[#007F68] border-t-transparent animate-spin" />
+          <span className="text-xs font-semibold text-[#294B57]/70">Restoring NavJyoti session...</span>
         </div>
       </div>
     );

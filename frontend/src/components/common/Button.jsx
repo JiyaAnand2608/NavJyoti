@@ -23,12 +23,13 @@ export function Button({
   };
 
   const variants = {
-    primary: "bg-[#00524c] hover:bg-[#27756c] text-white shadow-xs hover:shadow focus:ring-[#00524c]",
-    secondary: "bg-[#17394A] hover:bg-[#0f2632] text-white shadow-xs hover:shadow focus:ring-[#17394A]",
-    gold: "bg-[#F5C45E] hover:bg-[#dca948] text-[#17394A] font-semibold shadow-xs focus:ring-[#F5C45E]",
-    outline: "bg-white hover:bg-slate-50 text-[#17394A] border border-slate-200 hover:border-slate-300 focus:ring-slate-300",
-    ghost: "text-[#17394A] hover:bg-slate-100 focus:ring-slate-200",
-    danger: "bg-[#D9847D] hover:bg-[#c26d66] text-white focus:ring-[#D9847D]",
+    primary: "bg-[#007F68] hover:bg-[#005F52] text-white shadow-xs hover:shadow focus:ring-[#007F68]",
+    secondary: "bg-[#103342] hover:bg-[#005F52] text-white shadow-xs hover:shadow focus:ring-[#103342]",
+    teal: "bg-[#005F52] hover:bg-[#007F68] text-white shadow-xs focus:ring-[#005F52]",
+    gold: "bg-[#F4B83F] hover:bg-[#dfa62d] text-[#103342] font-semibold shadow-xs focus:ring-[#F4B83F]",
+    outline: "bg-[#FBF8F2] hover:bg-white text-[#103342] border border-[#D8E6DA] hover:border-[#007F68] focus:ring-[#007F68]",
+    ghost: "text-[#294B57] hover:bg-[#DDF0E3]/60 hover:text-[#103342] focus:ring-[#A8D5B5]",
+    danger: "bg-[#E57373] hover:bg-[#d25f5f] text-white focus:ring-[#E57373]",
   };
 
   return (

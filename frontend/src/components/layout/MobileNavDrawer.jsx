@@ -63,23 +63,31 @@ export function MobileNavDrawer({ isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 md:hidden">
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
-      <div className="fixed inset-y-0 left-0 w-72 bg-[#17394A] text-white p-5 flex flex-col justify-between shadow-2xl">
+      <div className="fixed inset-0 bg-[#103342]/60 backdrop-blur-xs" onClick={onClose} />
+      <div className="fixed inset-y-0 left-0 w-72 bg-[#103342] text-white p-5 flex flex-col justify-between shadow-2xl">
         <div>
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-white p-1">
-                <img src="/logo.jpg" alt="NavJyoti" className="w-full h-full object-contain" />
+              <div className="w-9 h-9 rounded-xl bg-white p-0.5 overflow-hidden flex items-center justify-center shrink-0">
+                <img
+                  src="/logo.jpg"
+                  alt="NavJyoti"
+                  className="w-full h-full object-cover scale-115 object-center"
+                />
               </div>
               <div>
                 <span className="font-bold text-base font-serif">NavJyoti</span>
-                <span className="block text-[10px] text-[#00524c] font-semibold uppercase">
+                <span className="block text-[10px] text-[#A8D5B5] font-semibold uppercase">
                   {isWorker ? "Worker Portal" : "Parent Portal"}
                 </span>
               </div>
             </div>
-            <button onClick={onClose} className="p-1 rounded-lg text-slate-300 hover:bg-white/10 cursor-pointer">
+            <button
+              onClick={onClose}
+              className="p-1 rounded-lg text-slate-300 hover:bg-white/10 cursor-pointer"
+              aria-label="Close menu"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -95,7 +103,7 @@ export function MobileNavDrawer({ isOpen, onClose }) {
                   onClick={onClose}
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-                      isActive ? 'bg-[#00524c] text-white font-semibold' : 'text-slate-300 hover:bg-white/10'
+                      isActive ? 'bg-[#007F68] text-white font-semibold' : 'text-slate-300 hover:bg-white/10'
                     }`
                   }
                 >

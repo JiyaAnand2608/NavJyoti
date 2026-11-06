@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useHealthData } from '../../contexts/HealthDataContext';
-import { Card, CardHeader, CardBody } from '../../components/common/Card';
+import { Card, CardHeader } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
-import { Syringe, CheckCircle2, Clock, Calendar, Check, Search } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Check } from 'lucide-react';
 
 export function VaccinationMgmtPage() {
   const { childrenList, administerDose } = useHealthData();
@@ -30,22 +29,22 @@ export function VaccinationMgmtPage() {
     : allPendingDoses.filter((d) => d.status === filterType);
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto text-[#294B57]">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[#17394A] font-serif">
+          <h1 className="text-2xl font-bold text-[#103342] font-serif">
             Vaccination Management & Session Drive
           </h1>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-[#294B57]">
             Cohort immunisation queue for Village Health & Nutrition Day (VHND) sessions
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 p-1 bg-white border border-slate-200 rounded-xl text-xs font-medium">
+        <div className="flex items-center gap-1.5 p-1 bg-[#FBF8F2] border border-[#D8E6DA] rounded-xl text-xs font-medium">
           <button
             onClick={() => setFilterType('all')}
             className={`px-3 py-1.5 rounded-lg cursor-pointer ${
-              filterType === 'all' ? 'bg-[#17394A] text-white' : 'text-slate-600 hover:bg-slate-50'
+              filterType === 'all' ? 'bg-[#103342] text-white font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
             }`}
           >
             All Pending ({allPendingDoses.length})
@@ -53,7 +52,7 @@ export function VaccinationMgmtPage() {
           <button
             onClick={() => setFilterType('overdue')}
             className={`px-3 py-1.5 rounded-lg cursor-pointer ${
-              filterType === 'overdue' ? 'bg-[#ECA4A2] text-white' : 'text-slate-600 hover:bg-slate-50'
+              filterType === 'overdue' ? 'bg-[#E57373] text-white font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
             }`}
           >
             Overdue Catch-up
@@ -61,7 +60,7 @@ export function VaccinationMgmtPage() {
           <button
             onClick={() => setFilterType('due_soon')}
             className={`px-3 py-1.5 rounded-lg cursor-pointer ${
-              filterType === 'due_soon' ? 'bg-[#F5C45E] text-[#17394A]' : 'text-slate-600 hover:bg-slate-50'
+              filterType === 'due_soon' ? 'bg-[#F4B83F] text-[#103342] font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
             }`}
           >
             Due in 7–14 Days
@@ -69,14 +68,14 @@ export function VaccinationMgmtPage() {
         </div>
       </div>
 
-      <Card>
+      <Card className="bg-[#FBF8F2] border-[#D8E6DA]">
         <CardHeader
           title="Scheduled Immunisation Queue"
           subtitle="Frontline verification for administered doses"
         />
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider">
+            <thead className="bg-[#F0EBE1]/70 border-b border-[#D8E6DA] text-[#294B57] uppercase tracking-wider">
               <tr>
                 <th className="py-3 px-4">Child Name & ID</th>
                 <th className="py-3 px-3">Vaccine Dose</th>
@@ -86,17 +85,17 @@ export function VaccinationMgmtPage() {
                 <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody className="divide-y divide-[#D8E6DA]/70 text-[#294B57]">
               {displayedDoses.map((dose) => (
-                <tr key={`${dose.childId}_${dose.vaccineId}`} className="hover:bg-slate-50/70">
+                <tr key={`${dose.childId}_${dose.vaccineId}`} className="hover:bg-[#F0EBE1]/40">
                   <td className="py-3 px-4">
-                    <span className="font-bold text-[#17394A] block">{dose.childName}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">{dose.childId}</span>
+                    <span className="font-bold text-[#103342] block">{dose.childName}</span>
+                    <span className="text-[10px] text-[#294B57]/70 font-mono">{dose.childId}</span>
                   </td>
                   <td className="py-3 px-3">
-                    <span className="font-bold text-[#17394A]">{dose.vaccineName}</span>
+                    <span className="font-bold text-[#103342]">{dose.vaccineName}</span>
                   </td>
-                  <td className="py-3 px-3">{dose.village}</td>
+                  <td className="py-3 px-3 text-[#103342]">{dose.village}</td>
                   <td className="py-3 px-3 font-mono">{dose.dueDate || 'Session Due'}</td>
                   <td className="py-3 px-3">
                     {dose.status === 'overdue' ? (
@@ -115,7 +114,7 @@ export function VaccinationMgmtPage() {
                         });
                         alert(`Officially recorded ${dose.vaccineName} for ${dose.childName}!`);
                       }}
-                      className="px-3 py-1.5 rounded-lg bg-[#006B64] text-white font-semibold text-xs hover:bg-[#00524c] transition-all cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                      className="px-3 py-1.5 rounded-full bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] transition-all cursor-pointer inline-flex items-center gap-1 shadow-2xs"
                     >
                       <Check className="w-3.5 h-3.5" />
                       <span>Mark Administered</span>

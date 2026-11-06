@@ -4,7 +4,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import {
   LayoutDashboard,
-  Users,
   Syringe,
   Activity,
   FileText,
@@ -25,7 +24,7 @@ import clsx from 'clsx';
 
 export function Sidebar({ collapsed, setCollapsed }) {
   const { user, role, logout, switchRole } = useAuth();
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const navigate = useNavigate();
 
   const isWorker = role === 'worker' || role === 'supervisor';
@@ -77,22 +76,26 @@ export function Sidebar({ collapsed, setCollapsed }) {
   return (
     <aside
       className={clsx(
-        "hidden md:flex flex-col h-screen sticky top-0 bg-[#17394A] text-white z-30 transition-all duration-300 border-r border-[#214f66]/60 shadow-lg",
+        "hidden md:flex flex-col h-screen sticky top-0 bg-[#103342] text-white z-30 transition-all duration-300 border-r border-[#005F52]/30 shadow-lg",
         collapsed ? "w-20" : "w-64"
       )}
     >
       {/* Brand Header */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 overflow-hidden">
-          <div className="w-9 h-9 rounded-xl bg-white p-1 shrink-0 shadow-xs flex items-center justify-center">
-            <img src="/logo.jpg" alt="NavJyoti" className="w-full h-full object-contain" />
+          <div className="w-10 h-10 rounded-xl bg-white p-0.5 shrink-0 shadow-xs flex items-center justify-center overflow-hidden border border-[#D8E6DA]/50">
+            <img
+              src="/logo.jpg"
+              alt="NavJyoti"
+              className="w-full h-full object-cover scale-115 object-center"
+            />
           </div>
           {!collapsed && (
             <div className="truncate">
               <span className="text-lg font-bold font-serif tracking-tight text-white flex items-center gap-1">
-                Nav<span className="text-[#F5C45E]">Jyoti</span>
+                NavJyoti
               </span>
-              <span className="block text-[9px] uppercase tracking-wider text-[#A3D9C3] font-semibold">
+              <span className="block text-[9.5px] uppercase tracking-wider text-[#A8D5B5] font-semibold">
                 {isWorker ? "Health Worker Portal" : "Caregiver Portal"}
               </span>
             </div>
@@ -107,7 +110,7 @@ export function Sidebar({ collapsed, setCollapsed }) {
             <span className="text-slate-300 text-[11px]">Role:</span>
             <button
               onClick={handleRoleToggle}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#006B64] hover:bg-[#00544e] text-white font-medium text-[11px] transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#007F68] hover:bg-[#005F52] text-white font-medium text-[11px] transition-colors cursor-pointer"
               title="Switch demo role between Parent and Health Worker"
             >
               <RefreshCw className="w-3 h-3" />
@@ -119,7 +122,7 @@ export function Sidebar({ collapsed, setCollapsed }) {
 
       {/* Primary Navigation List */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 px-3 pb-1">
+        <div className="text-[10px] uppercase font-bold tracking-wider text-[#A8D5B5]/80 px-3 pb-1">
           {!collapsed && "Primary"}
         </div>
         {primaryNav.map((item) => {
@@ -132,7 +135,7 @@ export function Sidebar({ collapsed, setCollapsed }) {
                 clsx(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all group",
                   isActive
-                    ? "bg-[#EAF7F0] text-[#006B64] shadow-xs font-bold"
+                    ? "bg-[#DDF0E3] text-[#007F68] shadow-xs font-bold"
                     : "text-slate-300 hover:bg-white/10 hover:text-white"
                 )
               }
@@ -145,7 +148,7 @@ export function Sidebar({ collapsed, setCollapsed }) {
         })}
 
         {/* Secondary Navigation */}
-        <div className="pt-4 text-[10px] uppercase font-bold tracking-wider text-slate-400 px-3 pb-1 border-t border-white/10 mt-3">
+        <div className="pt-4 text-[10px] uppercase font-bold tracking-wider text-[#A8D5B5]/80 px-3 pb-1 border-t border-white/10 mt-3">
           {!collapsed && "Secondary"}
         </div>
         {secondaryNav.map((item) => {
@@ -158,7 +161,7 @@ export function Sidebar({ collapsed, setCollapsed }) {
                 clsx(
                   "flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all group",
                   isActive
-                    ? "bg-[#EAF7F0] text-[#006B64] shadow-xs font-bold"
+                    ? "bg-[#DDF0E3] text-[#007F68] shadow-xs font-bold"
                     : "text-slate-400 hover:bg-white/10 hover:text-white"
                 )
               }
@@ -172,18 +175,18 @@ export function Sidebar({ collapsed, setCollapsed }) {
       </nav>
 
       {/* Sidebar Footer / User Profile & Logout */}
-      <div className="p-3 border-t border-white/10 bg-[#0e2430]/70">
+      <div className="p-3 border-t border-white/10 bg-[#005F52]/20">
         {!collapsed ? (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#006B64] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+              <div className="w-8 h-8 rounded-full bg-[#007F68] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
                 {user?.name ? user.name[0] : (isWorker ? 'R' : 'S')}
               </div>
               <div className="truncate flex-1">
                 <p className="text-xs font-semibold text-white truncate">
                   {user?.name || (isWorker ? 'Rekha Devi (ANM)' : 'Sunita Sharma')}
                 </p>
-                <p className="text-[10px] text-slate-400 truncate">
+                <p className="text-[10px] text-slate-300 truncate">
                   {isWorker ? 'Bilaspur PHC • UP' : 'Caregiver • Rampur'}
                 </p>
               </div>

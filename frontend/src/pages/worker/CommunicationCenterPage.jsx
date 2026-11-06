@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useHealthData } from '../../contexts/HealthDataContext';
-import { Card, CardHeader, CardBody } from '../../components/common/Card';
-import { Badge } from '../../components/common/Badge';
+import { Card } from '../../components/common/Card';
 import { SimulationBadge, SimulationBanner } from '../../components/common/SimulationBadge';
-import { MessageSquare, Send, CheckCircle2, Phone, Baby } from 'lucide-react';
+import { Send, CheckCircle2 } from 'lucide-react';
 
 export function CommunicationCenterPage() {
   const { childrenList } = useHealthData();
@@ -37,13 +36,13 @@ export function CommunicationCenterPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto text-[#294B57]">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#17394A] font-serif">
+          <h1 className="text-2xl font-bold text-[#103342] font-serif">
             Parent Communication Center
           </h1>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-[#294B57]">
             Send bilingual SMS/WhatsApp immunisation reminders and follow-up alerts
           </p>
         </div>
@@ -56,8 +55,8 @@ export function CommunicationCenterPage() {
       />
 
       {sentNotice && (
-        <div className="p-3.5 rounded-xl bg-[#EAF7F0] border border-[#6bc5b5]/40 text-xs text-[#00524c] font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4" />
+        <div className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-[#007F68]" />
           <span>Simulated SMS alert successfully delivered to {selectedChild?.caregiverPhone}!</span>
         </div>
       )}
@@ -65,8 +64,8 @@ export function CommunicationCenterPage() {
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Child Selector */}
         <div className="md:col-span-4 space-y-4">
-          <Card className="p-4">
-            <h3 className="font-bold text-xs uppercase text-slate-400 mb-3 tracking-wider">Select Caregiver</h3>
+          <Card className="p-4 bg-[#FBF8F2] border-[#D8E6DA]">
+            <h3 className="font-bold text-xs uppercase text-[#294B57]/70 mb-3 tracking-wider">Select Caregiver</h3>
             <div className="space-y-2">
               {childrenList.map((child) => (
                 <div
@@ -76,11 +75,11 @@ export function CommunicationCenterPage() {
                     setMessageText(templates[templateLang].dueSoon);
                   }}
                   className={`p-3 rounded-xl border transition-all cursor-pointer text-xs ${
-                    child.id === selectedChildId ? 'bg-[#EAF5F8] border-[#006B64] font-semibold' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                    child.id === selectedChildId ? 'bg-[#DDF0E3] border-[#007F68] font-semibold' : 'bg-white border-[#D8E6DA] hover:bg-[#F0EBE1]'
                   }`}
                 >
-                  <div className="font-bold text-[#17394A]">{child.caregiverName}</div>
-                  <div className="text-[11px] text-slate-500">Child: {child.name} • {child.caregiverPhone}</div>
+                  <div className="font-bold text-[#103342]">{child.caregiverName}</div>
+                  <div className="text-[11px] text-[#294B57]">Child: {child.name} • {child.caregiverPhone}</div>
                 </div>
               ))}
             </div>
@@ -89,9 +88,9 @@ export function CommunicationCenterPage() {
 
         {/* Message Composition */}
         <div className="md:col-span-8">
-          <Card className="p-5">
+          <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA]">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-sm text-[#17394A]">Compose Alert</h3>
+              <h3 className="font-bold text-sm text-[#103342]">Compose Alert</h3>
               <div className="flex items-center gap-1.5 text-xs font-semibold">
                 <button
                   type="button"
@@ -99,7 +98,7 @@ export function CommunicationCenterPage() {
                     setTemplateLang('hi');
                     setMessageText(templates.hi.dueSoon);
                   }}
-                  className={`px-2.5 py-1 rounded-lg ${templateLang === 'hi' ? 'bg-[#17394A] text-white' : 'bg-slate-100 text-slate-600'}`}
+                  className={`px-3 py-1 rounded-full ${templateLang === 'hi' ? 'bg-[#103342] text-white' : 'bg-white text-[#294B57] border border-[#D8E6DA]'}`}
                 >
                   हिन्दी
                 </button>
@@ -109,7 +108,7 @@ export function CommunicationCenterPage() {
                     setTemplateLang('en');
                     setMessageText(templates.en.dueSoon);
                   }}
-                  className={`px-2.5 py-1 rounded-lg ${templateLang === 'en' ? 'bg-[#17394A] text-white' : 'bg-slate-100 text-slate-600'}`}
+                  className={`px-3 py-1 rounded-full ${templateLang === 'en' ? 'bg-[#103342] text-white' : 'bg-white text-[#294B57] border border-[#D8E6DA]'}`}
                 >
                   English
                 </button>
@@ -121,14 +120,14 @@ export function CommunicationCenterPage() {
               <button
                 type="button"
                 onClick={() => handleSelectTemplate('dueSoon')}
-                className="px-3 py-1.5 rounded-lg bg-[#fef7e8] border border-[#fbe09e] text-amber-900 text-xs font-medium cursor-pointer"
+                className="px-3 py-1.5 rounded-full bg-[#FDF8EF] border border-[#F4B83F]/50 text-[#B87D14] text-xs font-medium cursor-pointer hover:bg-amber-100"
               >
                 Template: Due Soon Notice
               </button>
               <button
                 type="button"
                 onClick={() => handleSelectTemplate('overdue')}
-                className="px-3 py-1.5 rounded-lg bg-[#fdf2f2] border border-[#ECA4A2]/60 text-[#d87e7b] text-xs font-medium cursor-pointer"
+                className="px-3 py-1.5 rounded-full bg-[#FDECEC] border border-[#E57373]/50 text-[#D9534F] text-xs font-medium cursor-pointer hover:bg-red-100"
               >
                 Template: Overdue Catch-up Alert
               </button>
@@ -136,7 +135,7 @@ export function CommunicationCenterPage() {
 
             <form onSubmit={handleSend} className="space-y-4 text-xs">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
+                <label className="block font-semibold text-[#103342] mb-1">
                   Message Content (Sent to {selectedChild?.caregiverPhone})
                 </label>
                 <textarea
@@ -144,14 +143,14 @@ export function CommunicationCenterPage() {
                   required
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-slate-200 text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#006B64]"
+                  className="w-full p-3 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#007F68]"
                 />
               </div>
 
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-[#006B64] text-white font-semibold text-xs hover:bg-[#00524c] transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  className="px-5 py-2.5 rounded-full bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   <Send className="w-4 h-4" />
                   <span>Send Simulated SMS Alert</span>
