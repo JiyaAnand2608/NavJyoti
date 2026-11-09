@@ -36,6 +36,7 @@ export function AuthProvider({ children }) {
           name: existingSession.name,
           phone: existingSession.phone,
           workerId: existingSession.workerId,
+          designation: existingSession.designation,
           jurisdiction: existingSession.jurisdiction,
           isSimulated: true,
         });
@@ -44,17 +45,18 @@ export function AuthProvider({ children }) {
     setIsLoading(false);
   }, []);
 
-  // 1-Click Demo Login
+  // 1-Click Demo Login for any role (parent, worker, supervisor)
   const loginWithDemo = (roleKey = 'parent') => {
     const accounts = getAccounts();
-    const demoAccount = accounts.find((a) => a.role === (roleKey === 'worker' ? 'worker' : 'parent')) || DEFAULT_ACCOUNTS[0];
+    const targetRole = roleKey === 'supervisor' ? 'supervisor' : roleKey === 'worker' ? 'worker' : 'parent';
+    const demoAccount = accounts.find((a) => a.role === targetRole) || DEFAULT_ACCOUNTS.find((a) => a.role === targetRole) || DEFAULT_ACCOUNTS[0];
 
     saveSession(demoAccount);
     setUser(demoAccount);
     return demoAccount;
   };
 
-  // Login with Mobile or Worker ID (Simulated OTP flow)
+  // Login with Mobile or Worker ID
   const loginWithIdentifier = (identifier, role = 'parent') => {
     const existing = findAccountByPhoneOrId(identifier, role);
 
@@ -66,10 +68,12 @@ export function AuthProvider({ children }) {
       const newAcc = {
         id: `usr_${role}_${Date.now()}`,
         role: role,
-        name: role === 'parent' ? "Demo Caregiver" : "Demo Health Worker",
+        name: role === 'parent' ? "Demo Caregiver" : role === 'supervisor' ? "Dr. Demo Supervisor" : "Demo Health Worker",
         phone: identifier,
-        workerId: role === 'worker' ? identifier : undefined,
+        workerId: role !== 'parent' ? identifier : undefined,
         village: "Rampur",
+        district: "Bilaspur Sadar",
+        state: "Uttar Pradesh",
         linkedChildIds: [],
         createdAt: new Date().toISOString(),
         isSimulated: true,
@@ -106,14 +110,32 @@ export function AuthProvider({ children }) {
     return newAccount;
   };
 
-  // Explicit Logout: Clears active session ONLY. Saved child records are strictly preserved!
+  // Update profile
+  const updateProfile = (patchData) => {
+    if (!user) return null;
+    const updated = { ...user, ...patchData };
+    createOrUpdateAccount(updated);
+    saveSession(updated);
+    setUser(updated);
+    return updated;
+  };
+
+  // Request password reset (simulated)
+  const requestPasswordReset = (identifier) => {
+    return {
+      success: true,
+      message: `Demo notice: Simulated reset instructions dispatched for ${identifier}. Non-operational until backend integration.`,
+    };
+  };
+
+  // Explicit Logout: Clears active session ONLY. Saved child records and accounts are strictly preserved!
   const logout = () => {
     clearSession();
     setUser(null);
   };
 
   const switchRole = (newRole) => {
-    loginWithDemo(newRole);
+    return loginWithDemo(newRole);
   };
 
   return (
@@ -126,6 +148,8 @@ export function AuthProvider({ children }) {
         loginWithDemo,
         loginWithIdentifier,
         registerCaregiver,
+        updateProfile,
+        requestPasswordReset,
         logout,
         switchRole,
         isSimulated: true,

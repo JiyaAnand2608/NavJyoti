@@ -4,11 +4,12 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardHeader, CardBody } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { SimulationBanner } from '../../components/common/SimulationBadge';
-import { QrCode, ArrowRight, CheckCircle2, ShieldCheck, MapPin, RefreshCw } from 'lucide-react';
+import { QrCode, ArrowRight, CheckCircle2, ShieldCheck, MapPin, RefreshCw, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export function QrHandoffPage() {
   const { childrenList } = useHealthData();
-  const [selectedChildId, setSelectedChildId] = useState('NJ-2024-0412'); // Ananya Verma (migrant_in)
+  const [selectedChildId, setSelectedChildId] = useState(childrenList[0]?.id || 'NJ-2024-0412');
   const [simulatedFacility, setSimulatedFacility] = useState('Rampur Sub-Centre (UP)');
   const [handoffStep, setHandoffStep] = useState(1);
 
@@ -20,7 +21,7 @@ export function QrHandoffPage() {
     setTimeout(() => {
       setSimulatedFacility('Surat Urban Primary Health Centre (Gujarat)');
       setHandoffStep(3);
-    }, 1500);
+    }, 1200);
   };
 
   const handleResetTransfer = () => {
@@ -29,12 +30,12 @@ export function QrHandoffPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto text-[#294B57]">
       <div>
         <h1 className="text-2xl font-bold text-[#103342] font-serif">
           Inter-Facility QR Record Handoff Simulator
         </h1>
-        <p className="text-xs text-[#294B57]/80">
+        <p className="text-xs text-[#294B57]">
           Demonstrate continuous care across state & district borders for seasonal migrant families
         </p>
       </div>
@@ -43,6 +44,28 @@ export function QrHandoffPage() {
         title="Cross-Location Demonstration"
         message="Simulates a migrant family moving from Uttar Pradesh to Gujarat. The QR code contains only a random secure token reference (zero personal data in QR), retrieving verified records at the destination facility."
       />
+
+      {/* Select Child Dropdown */}
+      <Card className="p-4 bg-[#FBF8F2] border-[#D8E6DA]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <span className="font-semibold text-[#103342]">Select Child to Generate Handoff Pass:</span>
+          <select
+            value={selectedChildId}
+            onChange={(e) => {
+              setSelectedChildId(e.target.value);
+              setHandoffStep(1);
+              setSimulatedFacility('Rampur Sub-Centre (UP)');
+            }}
+            className="px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] font-bold"
+          >
+            {childrenList.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.id}) • {c.village} ({c.migrationStatus})
+              </option>
+            ))}
+          </select>
+        </div>
+      </Card>
 
       {/* Workflow Steps Indicator */}
       <div className="grid grid-cols-3 gap-3 text-center text-xs">
@@ -76,15 +99,24 @@ export function QrHandoffPage() {
                 fgColor={"#103342"}
                 level={"M"}
               />
-              <span className="block text-[10px] font-mono text-[#294B57]/70 mt-2 font-medium">
+              <span className="block text-[10px] font-mono text-[#007F68] mt-2 font-bold">
                 TOKEN: {child?.qrToken}
               </span>
             </div>
 
-            <div className="text-[11px] text-[#294B57] space-y-1">
+            <div className="text-[11px] text-[#294B57] space-y-1 mb-3">
               <p>Child ID: <strong className="font-mono text-[#103342]">{child?.id}</strong></p>
               <p>Caregiver: <strong className="text-[#103342]">{child?.caregiverName}</strong></p>
             </div>
+
+            <Link
+              to={`/records/lookup/${child?.qrToken}`}
+              target="_blank"
+              className="text-xs font-semibold text-[#007F68] hover:underline inline-flex items-center gap-1"
+            >
+              <span>Test Public QR Lookup Screen</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
           </Card>
         </div>
 
@@ -118,7 +150,7 @@ export function QrHandoffPage() {
                 className="w-full py-2 rounded-xl bg-[#F0EBE1] hover:bg-[#E5DFD4] text-[#103342] font-semibold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 border border-[#D8E6DA]"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Reset Simulation to Origin</span>
+                <span>Reset Simulation to Origin Facility</span>
               </button>
             )}
           </Card>
@@ -131,7 +163,7 @@ export function QrHandoffPage() {
                 <span className="font-serif">Zero-Loss Record Retrieval at Destination Facility</span>
               </div>
               <div className="space-y-2 text-xs text-[#294B57]">
-                <p><strong>Child:</strong> {child?.name} ({child?.dob})</p>
+                <p><strong>Child:</strong> {child?.name} (DOB: {child?.dob}, {child?.ageMonths}m old)</p>
                 <p><strong>Previous Administered Vaccines:</strong> {child?.doses?.filter(d => d.status === 'administered').length} doses verified</p>
                 <p><strong>Immediate Catch-up Needed:</strong> {child?.doses?.filter(d => d.status !== 'administered').map(d => d.vaccineName).join(', ') || 'Up to date'}</p>
                 <p className="text-[11px] text-[#294B57]/80 pt-2 border-t border-[#007F68]/20">

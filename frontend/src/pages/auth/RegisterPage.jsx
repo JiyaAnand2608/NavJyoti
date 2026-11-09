@@ -12,6 +12,7 @@ export function RegisterPage() {
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [village, setVillage] = useState('Rampur');
   const [selectedLanguage, setSelectedLanguage] = useState(lang || 'hi');
   const [consent, setConsent] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
@@ -26,8 +27,9 @@ export function RegisterPage() {
       return;
     }
 
-    if (!phone.trim()) {
-      setErrorMsg('Please enter a valid mobile number');
+    const cleanPhone = phone.trim().replace(/\s/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setErrorMsg('Please enter a valid 10-digit mobile number');
       return;
     }
 
@@ -41,6 +43,7 @@ export function RegisterPage() {
       registerCaregiver({
         name,
         phone,
+        village,
         language: selectedLanguage,
         consent,
       });
@@ -72,69 +75,81 @@ export function RegisterPage() {
 
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-[#103342] font-serif">
-              {t('auth.createAccountTitle')}
+              {t('auth.createAccountTitle') || "Create Caregiver Account"}
             </h1>
             <p className="text-xs text-[#294B57] mt-1">
-              {t('auth.createAccountSubtitle')}
+              {t('auth.createAccountSubtitle') || "Sign up to track and organize your child's health journey"}
             </p>
           </div>
 
           <SimulationBanner
-            title="Demonstration Registration"
-            message="This creates a persistent caregiver account in your browser session. In production, this binds securely with state public health systems."
+            title="Demonstration Account Setup"
+            message="No real SMS verification required in this prototype. Submitting creates a local demo profile immediately."
           />
 
           {errorMsg && (
-            <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2 mb-4">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="my-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-            {/* Caregiver Name */}
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs mt-4">
             <div>
-              <label className="block font-semibold text-[#103342] mb-1">
-                {t('auth.fullName')}
+              <label className="block font-semibold text-[#103342] mb-1.5">
+                Caregiver Full Name
               </label>
               <input
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Geeta Devi"
-                className="w-full px-3 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#007F68]"
+                placeholder="e.g. Sunita Sharma"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
               />
             </div>
 
-            {/* Mobile Number */}
             <div>
-              <label className="block font-semibold text-[#103342] mb-1">
-                {t('auth.phoneOrId')}
+              <label className="block font-semibold text-[#103342] mb-1.5">
+                Mobile Number (for SMS reminders)
               </label>
               <input
-                type="text"
+                type="tel"
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 98XXX XXXXX"
-                className="w-full px-3 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#007F68]"
+                placeholder="+91 98765 43210"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
               />
             </div>
 
-            {/* Language Preference */}
             <div>
-              <label className="block font-semibold text-[#103342] mb-1">
-                {t('auth.preferredLanguage')}
+              <label className="block font-semibold text-[#103342] mb-1.5">
+                Village / Ward
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <select
+                value={village}
+                onChange={(e) => setVillage(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
+              >
+                <option value="Rampur">Rampur (Bilaspur Sub-Centre)</option>
+                <option value="Kalyanpur">Kalyanpur (Kalyanpur Sub-Centre)</option>
+                <option value="Shivpur">Shivpur (Shivpur Sub-Centre)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-[#103342] mb-1.5">
+                Preferred Interface Language
+              </label>
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setSelectedLanguage('en')}
-                  className={`py-2 rounded-xl border font-semibold text-xs transition-all cursor-pointer ${
+                  className={`py-2 px-3 rounded-xl border font-semibold transition-all cursor-pointer ${
                     selectedLanguage === 'en'
-                      ? 'bg-[#DDF0E3] border-[#007F68] text-[#007F68]'
-                      : 'border-[#D8E6DA] text-[#294B57] bg-white'
+                      ? 'bg-[#DDF0E3] border-[#007F68] text-[#005F52]'
+                      : 'bg-white border-[#D8E6DA] text-[#294B57] hover:bg-[#F0EBE1]'
                   }`}
                 >
                   English
@@ -142,10 +157,10 @@ export function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedLanguage('hi')}
-                  className={`py-2 rounded-xl border font-semibold text-xs transition-all cursor-pointer ${
+                  className={`py-2 px-3 rounded-xl border font-semibold transition-all cursor-pointer ${
                     selectedLanguage === 'hi'
-                      ? 'bg-[#DDF0E3] border-[#007F68] text-[#007F68]'
-                      : 'border-[#D8E6DA] text-[#294B57] bg-white'
+                      ? 'bg-[#DDF0E3] border-[#007F68] text-[#005F52]'
+                      : 'bg-white border-[#D8E6DA] text-[#294B57] hover:bg-[#F0EBE1]'
                   }`}
                 >
                   हिंदी (Hindi)
@@ -160,10 +175,10 @@ export function RegisterPage() {
                   type="checkbox"
                   checked={consent}
                   onChange={(e) => setConsent(e.target.checked)}
-                  className="mt-0.5 rounded text-[#007F68] focus:ring-[#007F68]"
+                  className="mt-0.5 rounded text-[#007F68] focus:ring-[#007F68] cursor-pointer"
                 />
                 <span className="text-[11px] text-[#294B57] leading-relaxed">
-                  {t('auth.consentText')}
+                  I agree to participate in the NavJyoti health support prototype and consent to receiving timely child vaccination reminders.
                 </span>
               </label>
             </div>
@@ -171,23 +186,25 @@ export function RegisterPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 rounded-full bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] transition-all shadow-xs cursor-pointer mt-2 disabled:opacity-50"
+              className="w-full py-3 rounded-full bg-[#007F68] hover:bg-[#005F52] text-white font-semibold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
             >
-              {isSubmitting ? "Creating Account..." : t('auth.createAccountBtn')}
+              <UserPlus className="w-4 h-4" />
+              <span>{isSubmitting ? "Creating Profile..." : "Register & Continue"}</span>
             </button>
           </form>
 
-          <div className="mt-5 text-center text-xs text-[#294B57]">
-            {t('auth.haveAccount')}{' '}
-            <Link to="/auth/login" className="font-semibold text-[#007F68] underline hover:text-[#005F52]">
-              {t('auth.signInHere')}
+          <div className="text-center mt-5 pt-4 border-t border-[#D8E6DA]/70 text-xs">
+            <span className="text-[#294B57]">Already registered? </span>
+            <Link to="/auth/login" className="font-bold text-[#007F68] hover:underline">
+              Sign in here
             </Link>
           </div>
         </div>
       </div>
 
-      <div className="text-center text-[11px] text-[#294B57]/70 py-2">
-        NavJyoti Healthcare Platform • Healthy Children, Brighter Tomorrows
+      {/* Footer */}
+      <div className="max-w-md mx-auto w-full text-center text-xs text-[#294B57]/70 py-4 border-t border-[#D8E6DA]/60">
+        NavJyoti Healthcare Prototype • MoHFW UIP Aligned
       </div>
     </div>
   );

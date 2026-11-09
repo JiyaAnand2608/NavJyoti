@@ -1,21 +1,54 @@
 import React, { useState } from 'react';
 import { useHealthData } from '../../contexts/HealthDataContext';
 import { Card, CardHeader } from '../../components/common/Card';
+import { Badge } from '../../components/common/Badge';
+import { Modal } from '../../components/common/Modal';
 import { SimulationBanner } from '../../components/common/SimulationBadge';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, PhoneCall, CheckCircle2, AlertCircle, Edit3, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export function PriorityFollowUpPage() {
-  const { childrenList } = useHealthData();
+  const { childrenList, updateFollowUp } = useHealthData();
   const [selectedFilter, setSelectedFilter] = useState('all');
+
+  // Follow-up outreach modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedChild, setSelectedChild] = useState(null);
+  const [outreachStatus, setOutreachStatus] = useState('contacted');
+  const [outreachNotes, setOutreachNotes] = useState('');
+  const [newPriority, setNewPriority] = useState('amber');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const redList = childrenList.filter((c) => c.priorityLevel === 'red');
   const amberList = childrenList.filter((c) => c.priorityLevel === 'amber');
   const greenList = childrenList.filter((c) => c.priorityLevel === 'green');
 
-  const displayedChildren = selectedFilter === 'all'
-    ? childrenList
-    : childrenList.filter((c) => c.priorityLevel === selectedFilter);
+  const displayedChildren =
+    selectedFilter === 'all'
+      ? childrenList
+      : childrenList.filter((c) => c.priorityLevel === selectedFilter);
+
+  const handleOpenOutreach = (child) => {
+    setSelectedChild(child);
+    setOutreachNotes(child.followUpNotes || '');
+    setNewPriority(child.priorityLevel);
+    setOutreachStatus('contacted');
+    setIsModalOpen(true);
+  };
+
+  const handleSaveOutreach = (e) => {
+    e.preventDefault();
+    if (!selectedChild) return;
+
+    updateFollowUp(selectedChild.id, {
+      priorityLevel: newPriority,
+      notes: `[${outreachStatus.toUpperCase()}] ${outreachNotes.trim()}`,
+    });
+
+    setIsModalOpen(false);
+    setSuccessMsg(`Outreach recorded for ${selectedChild.name}. Priority updated to ${newPriority.toUpperCase()}.`);
+    setTimeout(() => setSuccessMsg(''), 4000);
+  };
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto text-[#294B57]">
@@ -32,6 +65,13 @@ export function PriorityFollowUpPage() {
         title="Administrative Prioritisation Engine Notice"
         message="The Red / Amber / Green system reflects administrative follow-up workflow urgency (e.g., >30 days overdue), not clinical diagnostic or validated prognostic risk. Migration status triggers record-continuity cross-checks."
       />
+
+      {successMsg && (
+        <div className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-[#007F68]" />
+          <span>{successMsg}</span>
+        </div>
+      )}
 
       {/* Priority Summary KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -78,15 +118,28 @@ export function PriorityFollowUpPage() {
         </div>
       </div>
 
+      {/* Filter Reset if filtered */}
+      {selectedFilter !== 'all' && (
+        <div className="flex justify-between items-center text-xs">
+          <span className="font-semibold text-[#103342]">Filtered by: {selectedFilter.toUpperCase()}</span>
+          <button
+            onClick={() => setSelectedFilter('all')}
+            className="text-[#007F68] font-bold hover:underline cursor-pointer"
+          >
+            Clear Filter (Show All {childrenList.length})
+          </button>
+        </div>
+      )}
+
       {/* Actionable Follow-up List */}
-      <Card className="bg-[#FBF8F2] border-[#D8E6DA]">
+      <Card className="bg-[#FBF8F2] border-[#D8E6DA] overflow-hidden">
         <CardHeader
           title={`Follow-up Outreach Queue (${displayedChildren.length} Children)`}
-          subtitle="Click any child to log home visit or review past contact"
+          subtitle="Click Log Outreach to record home visits, counseling, or update priority"
         />
         <div className="divide-y divide-[#D8E6DA]/70 text-xs">
           {displayedChildren.map((child) => (
-            <div key={child.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-[#F0EBE1]/40">
+            <div key={child.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-[#F0EBE1]/40 transition-colors">
               <div className="flex items-start gap-3.5">
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 ${
                   child.priorityLevel === 'red' ? 'bg-[#FDECEC] text-[#D9534F]' :
@@ -97,42 +150,130 @@ export function PriorityFollowUpPage() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-[#103342]">{child.name}</span>
-                    <span className="text-[10px] text-[#294B57]/70 font-mono">({child.id})</span>
+                    <span className="font-bold text-sm text-[#103342] font-serif">{child.name}</span>
+                    <span className="text-[10px] font-mono text-[#007F68] font-bold">{child.id}</span>
                     {child.migrationStatus === 'migrant_in' && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#DDF0E3] text-[#007F68] border border-[#007F68]/30">
-                        In-Migrant Continuity Check
-                      </span>
+                      <Badge variant="teal">Migrant Inflow</Badge>
                     )}
                   </div>
-                  <p className="text-[#294B57] mt-0.5">
-                    Caregiver: <strong>{child.caregiverName}</strong> ({child.caregiverPhone}) • Village: {child.village}
+                  <p className="text-xs text-[#294B57] mt-0.5">
+                    Caregiver: <strong className="text-[#103342]">{child.caregiverName}</strong> ({child.caregiverPhone}) • Village: {child.village}
                   </p>
-                  <p className="text-[11px] text-[#294B57]/80 mt-1">
-                    Pending / Next Doses: {child.doses?.filter(d => d.status !== 'administered').map(d => d.vaccineName).join(', ') || 'None'}
-                  </p>
+                  {child.followUpNotes && (
+                    <p className="text-[11px] text-[#007F68] mt-1 font-medium italic">
+                      Latest Note: "{child.followUpNotes}"
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => handleOpenOutreach(child)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-2xs"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Log Outreach</span>
+                </button>
                 <Link
                   to={`/worker/children/${child.id}`}
-                  className="px-3 py-1.5 rounded-full bg-[#DDF0E3] hover:bg-[#C7E4CD] text-[#007F68] font-semibold text-xs"
+                  className="px-3 py-1.5 rounded-lg bg-white border border-[#D8E6DA] text-[#103342] font-semibold text-xs hover:bg-[#F0EBE1] inline-flex items-center gap-1"
                 >
-                  Record
-                </Link>
-                <Link
-                  to="/worker/messages"
-                  className="px-3 py-1.5 rounded-full bg-[#007F68] hover:bg-[#005F52] text-white font-semibold text-xs flex items-center gap-1 shadow-2xs"
-                >
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  <span>Send Alert</span>
+                  <span>360° View</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             </div>
           ))}
         </div>
       </Card>
+
+      {/* Outreach Action Modal */}
+      {isModalOpen && selectedChild && (
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title={`Log Outreach & Update Status: ${selectedChild.name}`}
+          subtitle={`Caregiver: ${selectedChild.caregiverName} (${selectedChild.caregiverPhone})`}
+        >
+          <form onSubmit={handleSaveOutreach} className="space-y-4 text-xs text-[#294B57]">
+            <div>
+              <label className="block font-semibold text-[#103342] mb-1">Outreach Action Taken</label>
+              <select
+                value={outreachStatus}
+                onChange={(e) => setOutreachStatus(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
+              >
+                <option value="contacted">Caregiver Contacted by Phone / ASHA</option>
+                <option value="home_visit">Home Visit Conducted & Mother Counseled</option>
+                <option value="scheduled_vhnd">Scheduled for Next Wednesday VHND Session</option>
+                <option value="resolved">Catch-up Doses Administered (Resolved)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-[#103342] mb-1">Update Priority Level</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNewPriority('red')}
+                  className={`py-2 rounded-xl border font-semibold text-xs cursor-pointer ${
+                    newPriority === 'red' ? 'bg-[#FDECEC] border-[#E57373] text-[#D9534F]' : 'bg-white border-[#D8E6DA]'
+                  }`}
+                >
+                  Red (Urgent)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewPriority('amber')}
+                  className={`py-2 rounded-xl border font-semibold text-xs cursor-pointer ${
+                    newPriority === 'amber' ? 'bg-[#FDF8EF] border-[#F4B83F] text-[#B87D14]' : 'bg-white border-[#D8E6DA]'
+                  }`}
+                >
+                  Amber (Due Soon)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewPriority('green')}
+                  className={`py-2 rounded-xl border font-semibold text-xs cursor-pointer ${
+                    newPriority === 'green' ? 'bg-[#DDF0E3] border-[#007F68] text-[#005F52]' : 'bg-white border-[#D8E6DA]'
+                  }`}
+                >
+                  Green (Up to Date)
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-[#103342] mb-1">Follow-up Notes</label>
+              <textarea
+                rows={3}
+                required
+                value={outreachNotes}
+                onChange={(e) => setOutreachNotes(e.target.value)}
+                placeholder="e.g. Spoke with mother; confirmed attendance for Pentavalent-2 on Wednesday..."
+                className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] focus:ring-2 focus:ring-[#007F68]"
+              />
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-white border border-[#D8E6DA] text-[#103342] font-semibold text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs"
+              >
+                Save Outreach
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

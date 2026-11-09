@@ -3,7 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export function ProtectedRoute({ allowedRoles = [] }) {
-  const { user, role, isAuthenticated, isLoading } = useAuth();
+  const { role, isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
   // Prevent flash while restoring session from storage
@@ -25,7 +25,13 @@ export function ProtectedRoute({ allowedRoles = [] }) {
 
   // Check role authorization if specified
   if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
-    return <Navigate to={role === 'worker' ? '/worker/dashboard' : '/parent/dashboard'} replace />;
+    const fallbackPath =
+      role === 'worker'
+        ? '/worker/dashboard'
+        : role === 'supervisor'
+        ? '/supervisor/analytics'
+        : '/parent/dashboard';
+    return <Navigate to={fallbackPath} replace />;
   }
 
   return <Outlet />;

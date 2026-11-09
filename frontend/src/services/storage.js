@@ -4,20 +4,22 @@
  * IMPORTANT ARCHITECTURE & SECURITY NOTICE:
  * This is a frontend-only prototype persistence abstraction using browser localStorage.
  * It does NOT provide production cryptographic security, real OTP verification, or server-enforced RBAC.
- * In production, this layer is replaced by FastAPI/PostgreSQL REST endpoints with JWT/HttpOnly cookie sessions.
+ * In production, this layer is replaced by RESTful API endpoints with JWT/HttpOnly cookie sessions.
  * 
  * Capabilities:
- * - Versioned schema management (SCHEMA_VERSION = 1)
+ * - Versioned schema management (SCHEMA_VERSION = 2)
  * - Safe JSON parsing with fallback
  * - Session persistence with explicit expiry policy
  * - Separation of active session from persistent demo accounts & child records
  * - Caregiver-child relationship mapping & isolation
  * - Preserving child records on logout
+ * - Communication history persistence
+ * - Reset demo data to factory defaults
  */
 
 import { INITIAL_CHILDREN } from '../data/mockChildren.js';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const STORAGE_KEYS = {
   SCHEMA_VERSION: 'navjyoti_schema_version',
@@ -26,12 +28,13 @@ const STORAGE_KEYS = {
   CHILDREN: 'navjyoti_children',
   APPOINTMENTS: 'navjyoti_appointments',
   NOTIFICATIONS: 'navjyoti_notifications',
+  COMMUNICATIONS: 'navjyoti_communications',
   LAST_SELECTED_CHILD: 'navjyoti_last_selected_child_map',
   LANG: 'navjyoti_lang',
   OFFLINE_QUEUE: 'navjyoti_offline_queue',
 };
 
-// Default Demo Accounts (Pre-seeded synthetic users)
+// Default Demo Accounts (Pre-seeded synthetic users for all 3 roles)
 export const DEFAULT_ACCOUNTS = [
   {
     id: "usr_parent_01",
@@ -78,10 +81,57 @@ export const DEFAULT_ACCOUNTS = [
     createdAt: "2023-01-01T00:00:00Z",
     isSimulated: true,
   },
+  {
+    id: "sup_moic_01",
+    role: "supervisor",
+    name: "Dr. Alok Verma",
+    designation: "Medical Officer In-Charge (MOIC)",
+    phone: "+91 94150 11223",
+    workerId: "MOIC-UP-BLS-1001",
+    jurisdiction: {
+      block: "Bilaspur Sadar Block",
+      district: "Bilaspur",
+      state: "Uttar Pradesh",
+      subCentresSupervised: ["Rampur Sub-Centre", "Kalyanpur Sub-Centre", "Shivpur Sub-Centre"],
+      villagesCovered: ["Rampur", "Kalyanpur", "Shivpur"],
+      assignedPopulation: 14200,
+      anmStaffCount: 6,
+      ashaWorkerCount: 18,
+    },
+    createdAt: "2022-06-01T00:00:00Z",
+    isSimulated: true,
+  },
+];
+
+export const DEFAULT_COMMUNICATIONS = [
+  {
+    id: "comm_1",
+    recipientName: "Sunita Sharma",
+    recipientPhone: "+91 98765 43210",
+    childId: "NJ-2024-0891",
+    childName: "Aarav Sharma",
+    type: "due_soon",
+    message: "नमस्ते Sunita Sharma, आपके बच्चे Aarav Sharma का अगला नियमित टीका (MR 1 & PCV) अगले सप्ताह देय है। कृपया बुधवार को रामपुर उप-केंद्र पर संपर्क करें। - एएनएम रेखा देवी",
+    channel: "Simulated SMS",
+    sentAt: "2024-11-01T10:30:00Z",
+    status: "Delivered (Simulated)",
+  },
+  {
+    id: "comm_2",
+    recipientName: "Pooja Verma",
+    recipientPhone: "+91 98112 34567",
+    childId: "NJ-2024-0412",
+    childName: "Ananya Verma",
+    type: "overdue",
+    message: "महत्वपूर्ण सूचना: Pooja Verma, आपके बच्चे Ananya Verma की आवश्यक खुराक Pentavalent-2 छूट गई है। बाल स्वास्थ्य सुरक्षा के लिए कृपया आगामी टीकाकरण सत्र में अवश्य आएं। - एएनएम रेखा देवी",
+    channel: "Simulated SMS",
+    sentAt: "2024-11-03T14:15:00Z",
+    status: "Delivered (Simulated)",
+  }
 ];
 
 // Helper for safe JSON reading
-function safeGet(key, fallback) {
+export function safeGet(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return fallback;
@@ -93,7 +143,7 @@ function safeGet(key, fallback) {
 }
 
 // Helper for safe JSON writing
-function safeSet(key, value) {
+export function safeSet(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
     return true;
@@ -110,17 +160,9 @@ export function initializeStorage() {
   const currentVersion = safeGet(STORAGE_KEYS.SCHEMA_VERSION, null);
 
   if (currentVersion !== SCHEMA_VERSION) {
-    // Check if previous children exist or seed defaults
-    const existingChildren = safeGet(STORAGE_KEYS.CHILDREN, null);
-    if (!existingChildren || !Array.isArray(existingChildren)) {
-      safeSet(STORAGE_KEYS.CHILDREN, INITIAL_CHILDREN);
-    }
-
-    const existingAccounts = safeGet(STORAGE_KEYS.ACCOUNTS, null);
-    if (!existingAccounts || !Array.isArray(existingAccounts)) {
-      safeSet(STORAGE_KEYS.ACCOUNTS, DEFAULT_ACCOUNTS);
-    }
-
+    safeSet(STORAGE_KEYS.CHILDREN, INITIAL_CHILDREN);
+    safeSet(STORAGE_KEYS.ACCOUNTS, DEFAULT_ACCOUNTS);
+    safeSet(STORAGE_KEYS.COMMUNICATIONS, DEFAULT_COMMUNICATIONS);
     safeSet(STORAGE_KEYS.SCHEMA_VERSION, SCHEMA_VERSION);
   }
 }
@@ -154,6 +196,7 @@ export function saveSession(user) {
     name: user.name,
     phone: user.phone,
     workerId: user.workerId,
+    designation: user.designation,
     jurisdiction: user.jurisdiction,
     loginAt: Date.now(),
     expiresAt: Date.now() + SESSION_EXPIRY_MS,
@@ -165,7 +208,6 @@ export function saveSession(user) {
 }
 
 export function clearSession() {
-  // Clear active session ONLY — child records and accounts are preserved!
   localStorage.removeItem(STORAGE_KEYS.SESSION);
 }
 
@@ -181,7 +223,7 @@ export function findAccountByPhoneOrId(identifier, role = 'parent') {
   const cleanId = String(identifier).trim().toLowerCase().replace(/[\s-]/g, '');
 
   return accounts.find((acc) => {
-    if (acc.role !== role) return false;
+    if (role && acc.role !== role) return false;
     const phoneClean = String(acc.phone || '').toLowerCase().replace(/[\s-]/g, '');
     const workerClean = String(acc.workerId || '').toLowerCase().replace(/[\s-]/g, '');
     return phoneClean.includes(cleanId) || workerClean.includes(cleanId);
@@ -220,6 +262,17 @@ export function getChildren() {
 
 export function saveChildren(children) {
   return safeSet(STORAGE_KEYS.CHILDREN, children);
+}
+
+export function updateChildRecord(childId, patchData) {
+  const children = getChildren();
+  const idx = children.findIndex((c) => c.id === childId);
+  if (idx < 0) return null;
+
+  const updatedChild = { ...children[idx], ...patchData, updatedAt: new Date().toISOString() };
+  children[idx] = updatedChild;
+  saveChildren(children);
+  return updatedChild;
 }
 
 /**
@@ -282,6 +335,17 @@ export function saveStoredNotifications(notifications) {
 }
 
 /**
+ * Communications
+ */
+export function getStoredCommunications(fallback = DEFAULT_COMMUNICATIONS) {
+  return safeGet(STORAGE_KEYS.COMMUNICATIONS, fallback);
+}
+
+export function saveStoredCommunications(comms) {
+  return safeSet(STORAGE_KEYS.COMMUNICATIONS, comms);
+}
+
+/**
  * Factory Reset Demo Data
  * Strictly isolated for development/demo testing
  */
@@ -291,5 +355,6 @@ export function resetAllDemoData() {
   safeSet(STORAGE_KEYS.LAST_SELECTED_CHILD, {});
   safeSet(STORAGE_KEYS.APPOINTMENTS, null);
   safeSet(STORAGE_KEYS.NOTIFICATIONS, null);
+  safeSet(STORAGE_KEYS.COMMUNICATIONS, DEFAULT_COMMUNICATIONS);
   clearSession();
 }
