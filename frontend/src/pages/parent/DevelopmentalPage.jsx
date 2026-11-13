@@ -1,271 +1,425 @@
+
 import React, { useState } from 'react';
 import { useHealthData } from '../../contexts/HealthDataContext';
-import { MILESTONE_DOMAINS, MILESTONE_SCHEDULE } from '../../data/milestoneSchedule';
+import {
+  MILESTONE_DOMAINS,
+  MILESTONE_SCHEDULE,
+} from '../../data/milestoneSchedule';
 import { Card, CardBody } from '../../components/common/Card';
-import { Badge } from '../../components/common/Badge';
-import { Modal } from '../../components/common/Modal';
-import { CheckCircle2, Circle, Info, PlusCircle, Check, AlertCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  Circle,
+  Info,
+  ClipboardList,
+  Calendar,
+  AlertCircle,
+} from 'lucide-react';
+
+function displayValue(value) {
+  if (value === null || value === undefined || value === '') {
+    return 'Not recorded';
+  }
+
+  return String(value);
+}
+
+function getStatusLabel(status) {
+  if (status === 'recorded' || status === 'observed') {
+    return 'Observed';
+  }
+
+  if (status === 'not_observed') {
+    return 'Not observed';
+  }
+
+  return status
+    ? status.replaceAll('_', ' ')
+    : 'Status not recorded';
+}
 
 export function DevelopmentalPage() {
-  const { activeChild, recordMilestoneObservation } = useHealthData();
-  const [selectedDomain, setSelectedDomain] = useState('all');
-  const [observationModalItem, setObservationModalItem] = useState(null);
-  const [obsStatus, setObsStatus] = useState('recorded');
-  const [obsNotes, setObsNotes] = useState('');
-  const [feedback, setFeedback] = useState('');
+  const {
+    activeChild,
+    childrenLoading,
+    childrenError,
+  } = useHealthData();
 
-  if (!activeChild) {
+  const [selectedDomain, setSelectedDomain] = useState('all');
+
+  // Loading state
+  if (childrenLoading) {
     return (
-      <div className="p-8 text-center text-xs text-[#294B57]">
-        No active child selected.
+      <div className="p-8 text-center text-sm text-[#294B57]">
+        Loading developmental observations...
       </div>
     );
   }
 
+  // Backend error state
+  if (childrenError) {
+    return (
+      <div className="p-6 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-center gap-3">
+        <AlertCircle className="w-5 h-5 shrink-0" />
+        <span>
+          Unable to load observations: {childrenError}
+        </span>
+      </div>
+    );
+  }
+
+  // No selected child
+  if (!activeChild) {
+    return (
+      <div className="p-8 text-center text-sm text-[#294B57]">
+        No active child selected.
+        Please select a child in My Children.
+      </div>
+    );
+  }
+
+  // Records retrieved through HealthDataContext
   const childMilestones = activeChild.milestones || [];
-  const recordedCount = childMilestones.filter((m) => m.status === 'recorded').length;
 
-  const handleOpenObserveModal = (item) => {
-    const existing = childMilestones.find((m) => m.milestoneId === item.id);
-    setObservationModalItem(item);
-    setObsStatus(existing ? existing.status : 'recorded');
-    setObsNotes(existing ? existing.notes || '' : '');
-  };
+  const recordedCount = childMilestones.filter(
+    (item) =>
+      item.status === 'recorded' ||
+      item.status === 'observed'
+  ).length;
 
-  const handleSaveObservation = (e) => {
-    e.preventDefault();
-    if (!observationModalItem) return;
-
-    recordMilestoneObservation(activeChild.id, {
-      milestoneId: observationModalItem.id,
-      domain: observationModalItem.domain,
-      title: observationModalItem.title,
-      status: obsStatus,
-      notes: obsNotes,
-    });
-
-    setObservationModalItem(null);
-    setFeedback(`Observation recorded for "${observationModalItem.title}".`);
-    setTimeout(() => setFeedback(''), 3500);
-  };
+  const filteredObservations =
+    selectedDomain === 'all'
+      ? childMilestones
+      : childMilestones.filter(
+          (item) => item.domain === selectedDomain
+        );
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto text-[#294B57]">
-      {/* Header */}
+
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#103342] font-serif">
             Growth & Milestone Observations
           </h1>
-          <p className="text-xs text-[#294B57]">
-            Observational checklists for {activeChild.name} ({activeChild.ageMonths} Months Old)
+
+          <p className="text-xs text-[#294B57] mt-1">
+            Developmental observations for {activeChild.name}
           </p>
         </div>
 
-        {/* Domain Filter Pills */}
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#FBF8F2] border border-[#D8E6DA] rounded-xl text-xs font-medium">
-          <button
-            onClick={() => setSelectedDomain('all')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-              selectedDomain === 'all' ? 'bg-[#103342] text-white font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
-            }`}
-          >
-            All Domains
-          </button>
-          {MILESTONE_DOMAINS.map((dom) => (
-            <button
-              key={dom.id}
-              onClick={() => setSelectedDomain(dom.id)}
-              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                selectedDomain === dom.id ? 'bg-[#007F68] text-white font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
-              }`}
-            >
-              {dom.name.split(' ')[0]}
-            </button>
-          ))}
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-[#005F52] text-xs font-semibold">
+          <ClipboardList className="w-4 h-4" />
+          {childMilestones.length} Database Records
         </div>
       </div>
 
-      {feedback && (
-        <div className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-[#007F68] shrink-0" />
-          <span>{feedback}</span>
-        </div>
-      )}
-
-      {/* Non-Diagnostic Disclaimer Alert */}
+      {/* INFORMATION NOTICE */}
       <div className="p-4 rounded-2xl bg-[#DDF0E3]/70 border border-[#A8D5B5] text-xs text-[#103342] flex items-start gap-3">
         <Info className="w-5 h-5 text-[#007F68] shrink-0 mt-0.5" />
+
         <div>
-          <span className="font-bold block mb-0.5">Observational Guidance Only — Non-Diagnostic:</span>
-          <span className="text-[#294B57]">
-            Developmental milestones are natural behavioral observations intended to encourage parental awareness and timely guidance with ASHA workers. Children develop at individual paces; these checklists do not constitute a clinical medical diagnosis.
+          <span className="font-bold block mb-1">
+            Developmental Guidance — Non-Diagnostic
           </span>
+
+          <p className="text-[#294B57] leading-relaxed">
+            Milestones describe developmental observations.
+            Children develop at different paces, and these
+            checklists are not medical diagnoses.
+
+            Recorded observations are retrieved from the
+            NavJyoti backend. The reference checklist below
+            does not determine whether your child has achieved
+            a milestone.
+          </p>
         </div>
       </div>
 
-      {/* 4 Domain Cards Overview with Progress Counts */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {MILESTONE_DOMAINS.map((dom) => {
-          const domObserved = childMilestones.filter((m) => m.domain === dom.id && m.status === 'recorded').length;
+      {/* SUMMARY CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+        <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA]">
+          <p className="text-xs font-semibold text-[#294B57]">
+            Total Database Records
+          </p>
+
+          <h2 className="text-3xl font-bold text-[#103342] mt-2">
+            {childMilestones.length}
+          </h2>
+
+          <p className="text-[11px] text-[#294B57] mt-2">
+            Entries saved in the backend
+          </p>
+        </Card>
+
+        <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA]">
+          <p className="text-xs font-semibold text-[#294B57]">
+            Marked Observed
+          </p>
+
+          <h2 className="text-3xl font-bold text-[#007F68] mt-2">
+            {recordedCount}
+          </h2>
+
+          <p className="text-[11px] text-[#294B57] mt-2">
+            Recorded observations, not clinical assessments
+          </p>
+        </Card>
+
+        <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA]">
+          <p className="text-xs font-semibold text-[#294B57]">
+            Schedule Status
+          </p>
+
+          <h2 className="text-base font-bold text-[#103342] mt-3">
+            Not Clinically Verified
+          </h2>
+
+          <p className="text-[11px] text-[#294B57] mt-2">
+            Reference milestones are not automatically marked
+            complete.
+          </p>
+        </Card>
+      </div>
+
+      {/* DOMAIN FILTER */}
+      <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#FBF8F2] border border-[#D8E6DA] rounded-xl text-xs font-medium w-fit">
+
+        <button
+          type="button"
+          onClick={() => setSelectedDomain('all')}
+          className={`px-3 py-2 rounded-lg cursor-pointer ${
+            selectedDomain === 'all'
+              ? 'bg-[#103342] text-white font-semibold'
+              : 'text-[#294B57] hover:bg-[#F0EBE1]'
+          }`}
+        >
+          All Domains
+        </button>
+
+        {MILESTONE_DOMAINS.map((domain) => (
+          <button
+            key={domain.id}
+            type="button"
+            onClick={() => setSelectedDomain(domain.id)}
+            className={`px-3 py-2 rounded-lg cursor-pointer ${
+              selectedDomain === domain.id
+                ? 'bg-[#007F68] text-white font-semibold'
+                : 'text-[#294B57] hover:bg-[#F0EBE1]'
+            }`}
+          >
+            {domain.name}
+          </button>
+        ))}
+
+      </div>
+
+      {/* DATABASE RECORDS */}
+      <section className="space-y-4">
+
+        <div>
+          <h2 className="text-lg font-bold text-[#103342] font-serif">
+            Recorded Milestone Observations
+          </h2>
+
+          <p className="text-xs text-[#294B57] mt-1">
+            Observations retrieved from PostgreSQL through FastAPI.
+          </p>
+        </div>
+
+        {filteredObservations.length === 0 ? (
+
+          <Card className="p-8 bg-[#FBF8F2] border-[#D8E6DA]">
+            <div className="text-center space-y-3">
+
+              <ClipboardList className="w-10 h-10 text-[#007F68] mx-auto" />
+
+              <h3 className="font-bold text-[#103342]">
+                No Recorded Observations
+              </h3>
+
+              <p className="text-xs text-[#294B57] max-w-md mx-auto">
+                No observations are available for the selected
+                domain. An authorized health worker can record
+                observations through NavJyoti.
+              </p>
+
+            </div>
+          </Card>
+
+        ) : (
+
+          <div className="space-y-3">
+
+            {filteredObservations.map((milestone, index) => {
+
+              const observed =
+                milestone.status === 'recorded' ||
+                milestone.status === 'observed';
+
+              return (
+                <Card
+                  key={milestone.id ?? index}
+                  className="p-4 bg-[#FBF8F2] border-[#D8E6DA]"
+                >
+
+                  <div className="flex items-start gap-3">
+
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                      observed
+                        ? 'bg-[#DDF0E3] text-[#007F68]'
+                        : 'bg-[#F0EBE1] text-[#294B57]'
+                    }`}>
+                      {observed
+                        ? <CheckCircle2 className="w-5 h-5" />
+                        : <Circle className="w-5 h-5" />}
+                    </div>
+
+                    <div className="flex-1 space-y-2">
+
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+
+                        <h3 className="font-bold text-sm text-[#103342]">
+                          {displayValue(milestone.title)}
+                        </h3>
+
+                        <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${
+                          observed
+                            ? 'bg-[#DDF0E3] text-[#005F52]'
+                            : 'bg-[#F0EBE1] text-[#294B57]'
+                        }`}>
+                          {getStatusLabel(milestone.status)}
+                        </span>
+
+                      </div>
+
+                      <p className="text-xs text-[#294B57]">
+                        Domain: {displayValue(milestone.domain)}
+                      </p>
+
+                      <p className="text-xs text-[#294B57] flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-[#007F68]" />
+                        Observation Date: {displayValue(milestone.observedDate)}
+                      </p>
+
+                      {milestone.notes &&
+                        milestone.notes !== milestone.title && (
+                          <p className="text-xs text-[#294B57] bg-white p-3 rounded-xl border border-[#D8E6DA]">
+                            {milestone.notes}
+                          </p>
+                        )}
+
+                    </div>
+                  </div>
+
+                </Card>
+              );
+            })}
+
+          </div>
+        )}
+
+      </section>
+
+      {/* REFERENCE MILESTONE SCHEDULE */}
+      <section className="space-y-4">
+
+        <div>
+          <h2 className="text-lg font-bold text-[#103342] font-serif">
+            Developmental Milestone Reference
+          </h2>
+
+          <p className="text-xs text-[#294B57] mt-1">
+            Educational checklist only. These items are not
+            automatically linked to the database records.
+          </p>
+        </div>
+
+        {MILESTONE_SCHEDULE.map((band) => {
+
+          const visibleItems = band.items.filter(
+            (item) =>
+              selectedDomain === 'all' ||
+              item.domain === selectedDomain
+          );
+
+          if (visibleItems.length === 0) return null;
+
           return (
-            <Card key={dom.id} className="p-4 bg-[#FBF8F2] border-[#D8E6DA] flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-[#007F68]">
-                  Domain Benchmark
+            <Card
+              key={band.ageBand}
+              className="overflow-hidden bg-[#FBF8F2] border-[#D8E6DA]"
+            >
+
+              <div className="bg-[#F0EBE1]/70 px-5 py-3 border-b border-[#D8E6DA] flex items-center justify-between gap-3">
+
+                <h3 className="font-bold text-sm text-[#103342] font-serif">
+                  {band.ageBand}
+                </h3>
+
+                <span className="text-[11px] text-[#294B57]">
+                  Reference Only
                 </span>
-                <h3 className="font-bold text-sm text-[#103342] mt-1">{dom.name}</h3>
-                <p className="text-[11px] text-[#294B57] mt-1 leading-relaxed">
-                  {dom.description}
-                </p>
+
               </div>
-              <div className="mt-3 pt-2 border-t border-[#D8E6DA]/70 flex items-center justify-between text-xs font-semibold text-[#007F68]">
-                <span>{domObserved} Checkpoints Noted</span>
-              </div>
+
+              <CardBody className="p-0">
+
+                <div className="divide-y divide-[#D8E6DA]/70">
+
+                  {visibleItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-4 flex items-start justify-between gap-4"
+                    >
+
+                      <div className="space-y-2">
+
+                        <div className="flex items-center gap-2">
+
+                          <Circle className="w-4 h-4 text-[#294B57]/50 shrink-0" />
+
+                          <span className="font-bold text-sm text-[#103342]">
+                            {item.title}
+                          </span>
+
+                        </div>
+
+                        <p className="text-xs text-[#294B57] pl-6">
+                          {item.guidance}
+                        </p>
+
+                        <p className="text-[11px] text-[#007F68] pl-6">
+                          Domain: {item.domain}
+                        </p>
+
+                      </div>
+
+                      <span className="shrink-0 rounded-full bg-[#DDF0E3] text-[#005F52] px-3 py-1 text-[10px] font-semibold">
+                        Reference
+                      </span>
+
+                    </div>
+                  ))}
+
+                </div>
+
+              </CardBody>
             </Card>
           );
         })}
+
+      </section>
+
+      {/* FOOTER NOTICE */}
+      <div className="p-4 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-xs text-[#294B57]">
+        <strong>NavJyoti Development Notice:</strong>{' '}
+        Parents can view recorded observations on this page.
+        Creating new milestone records is currently restricted
+        to authorized health workers by the FastAPI backend.
       </div>
 
-      {/* Age Band Sections */}
-      <div className="space-y-6">
-        {MILESTONE_SCHEDULE.map((band) => (
-          <Card key={band.ageBand} className="overflow-hidden bg-[#FBF8F2] border-[#D8E6DA]">
-            <div className="bg-[#F0EBE1]/70 px-5 py-3 border-b border-[#D8E6DA] flex items-center justify-between">
-              <span className="font-bold text-sm text-[#103342] font-serif">{band.ageBand}</span>
-              <span className="text-[11px] text-[#294B57]">Early Childhood Observation</span>
-            </div>
-            <CardBody className="p-0">
-              <div className="divide-y divide-[#D8E6DA]/70 text-xs">
-                {band.items.map((item) => {
-                  if (selectedDomain !== 'all' && item.domain !== selectedDomain) return null;
-                  const logged = childMilestones.find((m) => m.milestoneId === item.id);
-                  const isRecorded = logged?.status === 'recorded';
-
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => handleOpenObserveModal(item)}
-                      className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#F0EBE1]/40 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                            isRecorded ? 'bg-[#DDF0E3] text-[#007F68]' : 'bg-[#F0EBE1] text-[#294B57]/50'
-                          }`}
-                        >
-                          {isRecorded ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm text-[#103342]">{item.title}</span>
-                            <span className="text-[10px] uppercase font-bold text-[#007F68] bg-[#DDF0E3] px-2 py-0.5 rounded-full">
-                              {item.domain}
-                            </span>
-                          </div>
-                          <p className="text-[#294B57] text-xs mt-0.5">{item.guidance}</p>
-                          {logged?.notes && (
-                            <p className="text-[11px] text-[#007F68] mt-1 font-medium">
-                              Caregiver Observation: "{logged.notes}" ({logged.observedDate})
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="sm:text-right shrink-0">
-                        {isRecorded ? (
-                          <Badge variant="upToDate">Observed</Badge>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#007F68] hover:underline">
-                            <PlusCircle className="w-3.5 h-3.5" />
-                            <span>Log Observation</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardBody>
-          </Card>
-        ))}
-      </div>
-
-      {/* Observation Modal */}
-      {observationModalItem && (
-        <Modal
-          isOpen={!!observationModalItem}
-          onClose={() => setObservationModalItem(null)}
-          title="Log Milestone Observation"
-          subtitle={observationModalItem.title}
-        >
-          <form onSubmit={handleSaveObservation} className="space-y-4 text-xs text-[#294B57]">
-            <div className="p-3 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-xs">
-              <span className="font-bold text-[#103342] block mb-1">Observation Guidance:</span>
-              <span>{observationModalItem.guidance}</span>
-            </div>
-
-            <div>
-              <label className="block font-semibold text-[#103342] mb-1.5">Observation Status</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setObsStatus('recorded')}
-                  className={`py-2 px-3 rounded-xl border font-semibold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    obsStatus === 'recorded'
-                      ? 'bg-[#DDF0E3] border-[#007F68] text-[#005F52]'
-                      : 'bg-white border-[#D8E6DA] text-[#294B57]'
-                  }`}
-                >
-                  <CheckCircle2 className="w-4 h-4 text-[#007F68]" />
-                  <span>Observed & Present</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setObsStatus('not_observed')}
-                  className={`py-2 px-3 rounded-xl border font-semibold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    obsStatus === 'not_observed'
-                      ? 'bg-[#FDF8EF] border-[#F4B83F] text-[#B87D14]'
-                      : 'bg-white border-[#D8E6DA] text-[#294B57]'
-                  }`}
-                >
-                  <Circle className="w-4 h-4 text-slate-400" />
-                  <span>Not Observed Yet</span>
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block font-semibold text-[#103342] mb-1">
-                Parent Notes / Context (Optional)
-              </label>
-              <textarea
-                rows={3}
-                value={obsNotes}
-                onChange={(e) => setObsNotes(e.target.value)}
-                placeholder="e.g. Sits steadily without cushions during playtime..."
-                className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] focus:ring-2 focus:ring-[#007F68]"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setObservationModalItem(null)}
-                className="px-4 py-2 rounded-xl bg-white border border-[#D8E6DA] text-[#103342] font-semibold text-xs cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs"
-              >
-                Save Observation
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
     </div>
   );
 }

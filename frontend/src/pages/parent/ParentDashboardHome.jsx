@@ -25,7 +25,7 @@ import { Modal } from '../../components/common/Modal';
 
 export function ParentDashboardHome() {
   const { user } = useAuth();
-  const { childrenList, activeChild, activeChildId, setActiveChildId, registerChild, appointments, notifications } = useHealthData();
+  const { childrenList, activeChild, activeChildId, setActiveChildId, registerChild, appointments, notifications, childrenLoading, childrenError } = useHealthData();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -35,24 +35,43 @@ export function ParentDashboardHome() {
   const [newChildGender, setNewChildGender] = useState('Male');
   const [newChildBirthWeight, setNewChildBirthWeight] = useState('3.1');
   const [newChildBloodGroup, setNewChildBloodGroup] = useState('B+');
+  const [addChildError, setAddChildError] = useState('');
+  const [addingChild, setAddingChild] = useState(false);
 
-  const handleAddChildSubmit = (e) => {
+  const handleAddChildSubmit = async (e) => {
     e.preventDefault();
-    if (!newChildName.trim() || !newChildDob) return;
-
-    registerChild({
-      name: newChildName.trim(),
-      dob: newChildDob,
-      gender: newChildGender,
-      birthWeightKg: Number(newChildBirthWeight) || 3.1,
-      bloodGroup: newChildBloodGroup,
-      ageMonths: 1,
-    });
-
-    setIsAddModalOpen(false);
-    setNewChildName('');
-    setNewChildDob('');
+    if (!newChildName.trim() || !newChildDob || addingChild) return;
+    setAddChildError('');
+    setAddingChild(true);
+    try {
+      await registerChild({
+        name: newChildName.trim(),
+        dob: newChildDob,
+        gender: newChildGender,
+        birthWeightKg: Number(newChildBirthWeight),
+        bloodGroup: newChildBloodGroup,
+      });
+      setIsAddModalOpen(false);
+      setNewChildName('');
+      setNewChildDob('');
+    } catch (error) {
+      setAddChildError(error.message || 'Could not register child. Please try again.');
+    } finally {
+      setAddingChild(false);
+    }
   };
+
+  // Avoid presenting a loading request or API error as an empty family.
+  if (childrenLoading) {
+    return <div className="max-w-2xl mx-auto p-8 text-center text-[#294B57]">Loading child records from NavJyoti...</div>;
+  }
+  if (childrenError) {
+    return (
+      <div role="alert" className="max-w-2xl mx-auto p-6 rounded-2xl bg-red-50 text-red-800 border border-red-200">
+        Unable to load child records: {childrenError}
+      </div>
+    );
+  }
 
   // 1. EMPTY STATE: If caregiver has no linked children
   if (!childrenList || childrenList.length === 0 || !activeChild) {
@@ -153,13 +172,16 @@ export function ParentDashboardHome() {
                 </select>
               </div>
             </div>
+            {addChildError && <p role="alert" className="text-red-700">{addChildError}</p>}
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full py-3 rounded-full bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] transition-all cursor-pointer shadow-xs"
+                disabled={addingChild}
+                className="w-full py-3 rounded-full bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] transition-all cursor-pointer shadow-xs disabled:opacity-50"
               >
-                Create Digital Health Pass
+                {addingChild ? 'Saving...' : 'Register Child'}
               </button>
+              <p className="mt-2 text-[11px] text-[#294B57]">The child's name and birth date will be saved in PostgreSQL. Other fields are not yet supported by the registration API.</p>
             </div>
           </form>
         </Modal>
@@ -173,13 +195,21 @@ export function ParentDashboardHome() {
   const dueSoonDoses = activeChild.doses?.filter((d) => d.status === 'due_soon') || [];
   const overdueDoses = activeChild.doses?.filter((d) => d.status === 'overdue') || [];
   const nextDose = dueSoonDoses[0] || overdueDoses[0] || null;
+  // These are DATABASE dose entries, not a verified age-appropriate national schedule.
+  // Even 100% of entered doses is not proof that immunisation is up to date.
   const progressPercent = totalDoses > 0 ? Math.round((completedDoses / totalDoses) * 100) : 0;
+  const dateOfBirth = activeChild.dob || activeChild.date_of_birth;
+  const ageMonths = dateOfBirth && !Number.isNaN(new Date(dateOfBirth).getTime())
+    ? Math.max(0, (new Date().getFullYear() - new Date(dateOfBirth).getFullYear()) * 12
+      + new Date().getMonth() - new Date(dateOfBirth).getMonth()
+      - (new Date().getDate() < new Date(dateOfBirth).getDate() ? 1 : 0))
+    : null;
 
   // Developmental milestone summary
   const totalMilestonesObserved = activeChild.milestones?.filter((m) => m.status === 'recorded').length || 0;
 
   // Active appointments for active child
-  const childAppointments = appointments.filter((a) => a.childId === activeChild.id && a.status !== 'cancelled');
+  const childAppointments = appointments.filter((a) => String(a.childId) === String(activeChild.id) && a.status !== 'cancelled');
   const nextAppointment = childAppointments[0] || null;
 
   // Unread reminders
@@ -207,12 +237,12 @@ export function ParentDashboardHome() {
                 Caregiver Health Pass
               </span>
               <span className="text-xs text-[#294B57]">
-                {user?.village || "Rampur"} • {user?.jurisdiction?.phc || "Bilaspur PHC"}
+                {[user?.village, user?.jurisdiction?.phc].filter(Boolean).join(' • ') || 'Caregiver Portal'}
               </span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-bold text-[#103342] font-serif">
-              Welcome back, {user?.name || "Sunita Sharma"}
+              Welcome back, {user?.name || 'Caregiver'}
             </h1>
 
             <p className="text-xs sm:text-sm text-[#294B57] max-w-xl">
@@ -231,7 +261,7 @@ export function ParentDashboardHome() {
               >
                 {childrenList.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} ({c.ageMonths}m old)
+                    {c.name}
                   </option>
                 ))}
               </select>
@@ -258,20 +288,20 @@ export function ParentDashboardHome() {
                 <span>UIP Immunisation</span>
               </span>
               {overdueDoses.length > 0 ? (
-                <Badge variant="overdue">{overdueDoses.length} Overdue</Badge>
+                <Badge variant="overdue">{overdueDoses.length} Marked Overdue</Badge>
               ) : dueSoonDoses.length > 0 ? (
                 <Badge variant="dueSoon">Due Soon</Badge>
               ) : (
-                <Badge variant="upToDate">Up to Date</Badge>
+                <Badge variant="default">Schedule Unverified</Badge>
               )}
             </div>
 
             <div className="space-y-1">
               <div className="text-2xl font-bold text-[#103342]">
-                {completedDoses} / {totalDoses} Doses
+                {completedDoses} / {totalDoses} Recorded Doses
               </div>
               <p className="text-xs text-[#294B57]">
-                {progressPercent}% of age-appropriate national UIP vaccines completed
+                {totalDoses > 0 ? `${progressPercent}% of entered dose records marked administered; full UIP schedule not verified` : 'No vaccination records available; full UIP schedule not verified'}
               </p>
             </div>
 
@@ -308,7 +338,7 @@ export function ParentDashboardHome() {
                 {totalMilestonesObserved} Checkpoints
               </div>
               <p className="text-xs text-[#294B57]">
-                Natural behavioral milestones observed for age {activeChild.ageMonths} months
+                Recorded developmental observations{ageMonths !== null ? ` • Age ${ageMonths} months` : ''}
               </p>
             </div>
 
@@ -361,7 +391,7 @@ export function ParentDashboardHome() {
                   Need a home checkup or consultation with your village ANM?
                 </p>
                 <p className="text-[11px] text-[#294B57]/70">
-                  Regular sessions held on Wednesday (VHND).
+                  Check with your local health worker for available sessions.
                 </p>
               </div>
             )}
@@ -399,7 +429,7 @@ export function ParentDashboardHome() {
                       {nextDose.vaccineName}
                     </h4>
                     <p className="text-xs text-[#294B57] mt-1">
-                      Due around: <strong className="font-mono text-[#103342]">{nextDose.dueDate || "Next Routine Session"}</strong> at {activeChild.village} Sub-Centre.
+                      Recorded due date: <strong className="font-mono text-[#103342]">{nextDose.dueDate || 'Not provided'}</strong>. Confirm the schedule with your health worker.
                     </p>
                   </div>
                   <Badge variant={nextDose.status === 'overdue' ? 'overdue' : 'dueSoon'}>
@@ -427,8 +457,10 @@ export function ParentDashboardHome() {
               <div className="p-4 rounded-2xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] flex items-center gap-3">
                 <CheckCircle2 className="w-5 h-5 text-[#007F68] shrink-0" />
                 <div>
-                  <span className="font-bold block">All scheduled vaccines up to date!</span>
-                  <span>{activeChild.name} is on track for their current age. Next milestone checks can be logged anytime.</span>
+                  <span className="font-bold block">Vaccination schedule not yet verified</span>
+                  <span>{totalDoses === 0
+                    ? `No vaccination records are available for ${activeChild.name}. This does not mean vaccinations are complete.`
+                    : `There are ${totalDoses} recorded dose entries. This is not a complete age-appropriate vaccine schedule assessment.`}</span>
                 </div>
               </div>
             )}

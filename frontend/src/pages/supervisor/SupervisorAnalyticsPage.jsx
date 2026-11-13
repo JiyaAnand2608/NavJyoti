@@ -1,319 +1,406 @@
-import React, { useState, useMemo } from 'react';
-import { useHealthData } from '../../contexts/HealthDataContext';
-import { Card, CardHeader, CardBody } from '../../components/common/Card';
-import { Badge } from '../../components/common/Badge';
-import { Download, Users, TrendingUp, Building, ShieldCheck, Filter, CalendarCheck, Syringe } from 'lucide-react';
 
-export function SupervisorAnalyticsPage() {
-  const { allChildren, appointments } = useHealthData();
-  const [villageFilter, setVillageFilter] = useState('all');
-  const [workerFilter, setWorkerFilter] = useState('all');
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { Card } from '../../components/common/Card';
 
-  // Filter children based on active filters
-  const filteredChildren = useMemo(() => {
-    return allChildren.filter((child) => {
-      const matchVillage = villageFilter === 'all' || child.village === villageFilter;
-      const matchWorker = workerFilter === 'all' || child.assignedWorker?.includes(workerFilter);
-      return matchVillage && matchWorker;
-    });
-  }, [allChildren, villageFilter, workerFilter]);
+import {
+  Users,
+  Syringe,
+  CalendarCheck,
+  ClipboardCheck,
+  ShieldCheck,
+  Download,
+  RefreshCw,
+  AlertCircle,
+  Activity,
+  UserRoundCheck,
+} from 'lucide-react';
 
-  // Derived Metrics from filtered children
-  const totalRegisteredChildren = filteredChildren.length;
-  let totalAdministeredDoses = 0;
-  let totalScheduledDoses = 0;
-  let totalOverdueDoses = 0;
-  let fullyImmunisedCount = 0;
+const API_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://127.0.0.1:8000';
 
-  filteredChildren.forEach((child) => {
-    const admin = child.doses?.filter((d) => d.status === 'administered').length || 0;
-    const total = child.doses?.length || 0;
-    const overdue = child.doses?.filter((d) => d.status === 'overdue').length || 0;
+const TOKEN_KEY = 'navjyoti_access_token';
 
-    totalAdministeredDoses += admin;
-    totalScheduledDoses += total;
-    totalOverdueDoses += overdue;
-
-    if (child.priorityLevel === 'green' || (total > 0 && admin === total)) {
-      fullyImmunisedCount++;
-    }
-  });
-
-  const overallCoverageRate =
-    totalScheduledDoses > 0 ? Math.round((totalAdministeredDoses / totalScheduledDoses) * 100) : 0;
-  const redUrgentFollowups = filteredChildren.filter((c) => c.priorityLevel === 'red').length;
-  const amberDueSoonFollowups = filteredChildren.filter((c) => c.priorityLevel === 'amber').length;
-
-  // Appointment counts
-  const totalAppointments = appointments.length;
-  const pendingAppointments = appointments.filter((a) => a.status === 'requested').length;
-  const confirmedAppointments = appointments.filter((a) => a.status === 'confirmed').length;
-
-  // Village level breakdown derived dynamically from allChildren
-  const villageStats = useMemo(() => {
-    const villages = ['Rampur', 'Kalyanpur', 'Shivpur'];
-    return villages.map((vName) => {
-      const vChildren = allChildren.filter((c) => c.village === vName);
-      const vAdmin = vChildren.reduce(
-        (sum, c) => sum + (c.doses?.filter((d) => d.status === 'administered').length || 0),
-        0
-      );
-      const vTotal = vChildren.reduce((sum, c) => sum + (c.doses?.length || 0), 0);
-      const vOverdue = vChildren.reduce(
-        (sum, c) => sum + (c.doses?.filter((d) => d.status === 'overdue').length || 0),
-        0
-      );
-      const vFully = vChildren.filter((c) => c.priorityLevel === 'green').length;
-      const vCoverage = vTotal > 0 ? Math.round((vAdmin / vTotal) * 100) : 0;
-
-      return {
-        village: vName,
-        cohort: vChildren.length,
-        fullyImmunised: vFully,
-        coverage: vCoverage,
-        dropOutRate: (vOverdue * 1.5 + 2.5).toFixed(1),
-        overdue: vOverdue,
-      };
-    });
-  }, [allChildren]);
-
-  // Worker Workload Breakdown derived from shared data
-  const workerWorkload = useMemo(() => {
-    const workers = ['Rekha Devi (ANM)', 'Nirmala Devi (ANM)'];
-    return workers.map((wName) => {
-      const wChildren = allChildren.filter((c) => c.assignedWorker?.includes(wName.split(' ')[0]));
-      const wPending = appointments.filter(
-        (a) => a.assignedWorker?.includes(wName.split(' ')[0]) && a.status === 'requested'
-      ).length;
-      const wConfirmed = appointments.filter(
-        (a) => a.assignedWorker?.includes(wName.split(' ')[0]) && a.status === 'confirmed'
-      ).length;
-      const wUrgent = wChildren.filter((c) => c.priorityLevel === 'red').length;
-
-      return {
-        name: wName,
-        subCentre: wName.includes('Rekha') ? 'Rampur Sub-Centre' : 'Shivpur Sub-Centre',
-        assignedChildren: wChildren.length,
-        pendingAppointments: wPending,
-        confirmedAppointments: wConfirmed,
-        urgentFollowups: wUrgent,
-      };
-    });
-  }, [allChildren, appointments]);
-
-  const handleExportCSV = () => {
-    const headers = 'Village,Cohort_0_5,Fully_Immunised,Coverage_Percent,Dropout_Rate,Overdue_Doses\n';
-    const rows = villageStats
-      .map(
-        (v) =>
-          `${v.village},${v.cohort},${v.fullyImmunised},${v.coverage}%,${v.dropOutRate}%,${v.overdue}`
-      )
-      .join('\n');
-
-    const workloadHeaders = '\nWorker_Name,Sub_Centre,Assigned_Children,Pending_Visits,Confirmed_Visits,Urgent_Followups\n';
-    const workloadRows = workerWorkload
-      .map(
-        (w) =>
-          `"${w.name}","${w.subCentre}",${w.assignedChildren},${w.pendingAppointments},${w.confirmedAppointments},${w.urgentFollowups}`
-      )
-      .join('\n');
-
-    const blob = new Blob([headers + rows + workloadHeaders + workloadRows], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `navjyoti_supervisor_analytics_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-  };
-
+function MetricCard({ label, value, description, icon: Icon }) {
   return (
-    <div className="space-y-6 max-w-6xl mx-auto text-[#294B57]">
-      {/* Page Title & Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA]">
+      <div className="flex justify-between items-start gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#103342] font-serif">
-            Supervisor & Health Authority Analytics
-          </h1>
-          <p className="text-xs text-[#294B57]">
-            Aggregate public health coverage across sub-centres (Medical Officer In-Charge View)
+          <p className="text-xs font-medium text-[#294B57]">
+            {label}
+          </p>
+
+          <div className="text-3xl font-bold text-[#103342] mt-2">
+            {value}
+          </div>
+
+          <p className="text-[11px] text-[#294B57]/70 mt-2">
+            {description}
           </p>
         </div>
 
-        <button
-          onClick={handleExportCSV}
-          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-[#007F68] text-white text-xs font-semibold hover:bg-[#005F52] transition-all shadow-xs cursor-pointer"
+        <div className="w-10 h-10 rounded-xl bg-[#DDF0E3] text-[#007F68] flex items-center justify-center shrink-0">
+          <Icon className="w-5 h-5" />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+export function SupervisorAnalyticsPage() {
+  const { user } = useAuth();
+
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadAnalytics = useCallback(
+    async (signal) => {
+      if (user?.role !== 'supervisor') {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError('');
+
+      try {
+        const token = sessionStorage.getItem(TOKEN_KEY);
+
+        if (!token) {
+          throw new Error('Please sign in again.');
+        }
+
+        const response = await fetch(
+          `${API_URL}/supervisor/dashboard`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            signal,
+          }
+        );
+
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(
+            typeof result?.detail === 'string'
+              ? result.detail
+              : `Unable to load analytics (${response.status})`
+          );
+        }
+
+        const requiredFields = [
+          'total_children',
+          'total_workers',
+          'total_vaccinations',
+          'completed_vaccinations',
+          'pending_followups',
+          'upcoming_appointments',
+        ];
+
+        const validResponse = requiredFields.every(
+          (field) =>
+            typeof result?.[field] === 'number' &&
+            Number.isFinite(result[field]) &&
+            result[field] >= 0
+        );
+
+        if (!validResponse) {
+          throw new Error(
+            'The backend returned an unexpected analytics response.'
+          );
+        }
+
+        if (!signal?.aborted) {
+          setStats(result);
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+
+        setError(err.message || 'Unable to load analytics.');
+        setStats(null);
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [user?.role]
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    loadAnalytics(controller.signal);
+
+    return () => controller.abort();
+  }, [loadAnalytics, user?.id]);
+
+  const handleExportCSV = () => {
+    if (!stats) return;
+
+    const headers = [
+      'Metric',
+      'Count',
+    ];
+
+    const rows = [
+      ['Registered Children', stats.total_children],
+      ['Registered Health Workers', stats.total_workers],
+      ['Vaccination Records', stats.total_vaccinations],
+      ['Completed Vaccination Records', stats.completed_vaccinations],
+      ['Pending Follow-Ups', stats.pending_followups],
+      ['Upcoming Appointments', stats.upcoming_appointments],
+    ];
+
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) => row.join(',')),
+    ].join('\r\n');
+
+    const blob = new Blob([csv], {
+      type: 'text/csv;charset=utf-8;',
+    });
+
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+
+    anchor.href = url;
+    anchor.download = `navjyoti_supervisor_summary_${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
+
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+
+    URL.revokeObjectURL(url);
+  };
+
+  if (user?.role !== 'supervisor') {
+    return (
+      <div className="max-w-4xl mx-auto p-8 text-center bg-[#FBF8F2] border border-[#D8E6DA] rounded-2xl">
+        <ShieldCheck className="w-10 h-10 mx-auto text-[#007F68] mb-3" />
+
+        <h2 className="font-bold text-[#103342]">
+          Supervisor Access Required
+        </h2>
+
+        <p className="text-xs text-[#294B57] mt-2">
+          Sign in with an authorized Supervisor account.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto text-[#294B57]">
+
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <span className="inline-block px-3 py-1 mb-3 rounded-full bg-[#DDF0E3] border border-[#D8E6DA] text-[10px] text-[#007F68] font-bold uppercase tracking-wider">
+            Supervisor Portal
+          </span>
+
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#103342] font-serif">
+            Supervisor & Health Authority Analytics
+          </h1>
+
+          <p className="text-xs sm:text-sm text-[#294B57] mt-2">
+            Aggregate health records retrieved from NavJyoti's
+            FastAPI and PostgreSQL backend.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => loadAnalytics()}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-[#D8E6DA] text-[#007F68] text-xs font-semibold hover:bg-[#F0EBE1] disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
+            />
+            Refresh
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            disabled={!stats || loading}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#007F68] text-white text-xs font-semibold hover:bg-[#005F52] disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />
+            Export Aggregate CSV
+          </button>
+        </div>
+      </div>
+
+      {/* PRIVACY NOTICE */}
+      <div className="p-4 rounded-2xl bg-[#DDF0E3]/70 text-xs text-[#005F52] border border-[#D8E6DA] flex items-start gap-3">
+        <ShieldCheck className="w-5 h-5 shrink-0" />
+
+        <p>
+          <strong>Aggregate reporting:</strong> This page displays
+          overall counts without listing children's names or medical
+          histories. Access permissions are checked by FastAPI.
+          This prototype has not yet undergone a formal privacy or
+          regulatory compliance audit.
+        </p>
+      </div>
+
+      {/* ERROR */}
+      {error && (
+        <div
+          role="alert"
+          className="p-4 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2"
         >
-          <Download className="w-4 h-4 text-white" />
-          <span>Export Aggregate CSV</span>
-        </button>
-      </div>
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
-      {/* Privacy Notice */}
-      <div className="p-3.5 rounded-2xl bg-[#DDF0E3]/70 text-xs text-[#005F52] border border-[#D8E6DA]">
-        <ShieldCheck className="w-4 h-4 text-[#007F68] inline mr-1 -mt-0.5" />
-        <span>
-          <strong>Data Privacy Safeguard:</strong> In compliance with national healthcare standards, supervisor summaries aggregate statistics at the sector/facility level without exposing personal identity numbers.
-        </span>
-      </div>
+      {/* LOADING */}
+      {loading && (
+        <div className="p-5 bg-[#FBF8F2] rounded-2xl border border-[#D8E6DA] text-xs">
+          Loading PostgreSQL analytics...
+        </div>
+      )}
 
-      {/* Filter Controls */}
-      <Card className="p-4 bg-[#FBF8F2] border-[#D8E6DA]">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-[#007F68]" />
-            <span className="font-semibold text-[#103342]">Cohort Filters:</span>
+      {/* LIVE METRICS */}
+      {!loading && stats && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+
+            <MetricCard
+              label="Registered Children"
+              value={stats.total_children}
+              description="Total children in the database"
+              icon={Users}
+            />
+
+            <MetricCard
+              label="Health Workers"
+              value={stats.total_workers}
+              description="Registered worker accounts"
+              icon={UserRoundCheck}
+            />
+
+            <MetricCard
+              label="Vaccination Records"
+              value={stats.total_vaccinations}
+              description="Stored vaccine records, not schedule coverage"
+              icon={Syringe}
+            />
+
+            <MetricCard
+              label="Completed Vaccination Records"
+              value={stats.completed_vaccinations}
+              description="Records marked administered"
+              icon={ShieldCheck}
+            />
+
+            <MetricCard
+              label="Pending Follow-Ups"
+              value={stats.pending_followups}
+              description="Follow-up tasks marked pending"
+              icon={ClipboardCheck}
+            />
+
+            <MetricCard
+              label="Upcoming Appointments"
+              value={stats.upcoming_appointments}
+              description="Future requested, approved, or rescheduled visits"
+              icon={CalendarCheck}
+            />
+
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div>
-              <label className="text-[11px] font-medium text-[#294B57] mr-1.5">Village:</label>
-              <select
-                value={villageFilter}
-                onChange={(e) => setVillageFilter(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] text-xs font-semibold"
-              >
-                <option value="all">All Villages (Sector 1–3)</option>
-                <option value="Rampur">Rampur</option>
-                <option value="Kalyanpur">Kalyanpur</option>
-                <option value="Shivpur">Shivpur</option>
-              </select>
+          {/* RECORD SUMMARY */}
+          <Card className="bg-[#FBF8F2] border-[#D8E6DA] overflow-hidden">
+            <div className="p-5 border-b border-[#D8E6DA]">
+              <h2 className="font-bold text-sm text-[#103342] font-serif">
+                Database Record Summary
+              </h2>
+
+              <p className="text-xs text-[#294B57] mt-1">
+                Current aggregate totals from the Supervisor API.
+              </p>
             </div>
 
-            <div>
-              <label className="text-[11px] font-medium text-[#294B57] mr-1.5">ANM Worker:</label>
-              <select
-                value={workerFilter}
-                onChange={(e) => setWorkerFilter(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] text-xs font-semibold"
-              >
-                <option value="all">All Assigned ANMs</option>
-                <option value="Rekha Devi">Rekha Devi (ANM)</option>
-                <option value="Nirmala Devi">Nirmala Devi (ANM)</option>
-              </select>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-[#F0EBE1] text-[#294B57] uppercase">
+                  <tr>
+                    <th className="px-5 py-3">Metric</th>
+                    <th className="px-5 py-3 text-right">Total</th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-[#D8E6DA]">
+                  {[
+                    ['Children registered', stats.total_children],
+                    ['Health workers registered', stats.total_workers],
+                    ['Vaccination records', stats.total_vaccinations],
+                    ['Completed vaccine records', stats.completed_vaccinations],
+                    ['Pending follow-ups', stats.pending_followups],
+                    ['Upcoming appointments', stats.upcoming_appointments],
+                  ].map(([label, value]) => (
+                    <tr key={label}>
+                      <td className="px-5 py-3">{label}</td>
+                      <td className="px-5 py-3 text-right font-bold text-[#103342]">
+                        {value}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        </div>
-      </Card>
+          </Card>
 
-      {/* 4 Summary KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4 bg-[#FBF8F2] border-[#D8E6DA]">
-          <span className="text-[11px] font-medium text-[#294B57]">Cohort Size</span>
-          <div className="text-2xl font-bold text-[#103342] mt-1">{totalRegisteredChildren}</div>
-          <span className="text-[10px] text-[#294B57]/70 block mt-0.5">Children in selected filter</span>
-        </Card>
+          {/* LIMITATIONS */}
+          <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA]">
+            <div className="flex items-start gap-3">
+              <Activity className="w-5 h-5 text-[#007F68] shrink-0" />
 
-        <Card className="p-4 bg-[#FBF8F2] border-[#D8E6DA]">
-          <span className="text-[11px] font-medium text-[#294B57]">UIP Coverage Rate</span>
-          <div className="text-2xl font-bold text-[#007F68] mt-1">{overallCoverageRate}%</div>
-          <span className="text-[10px] text-[#294B57]/70 block mt-0.5">
-            {totalAdministeredDoses} of {totalScheduledDoses} doses given
-          </span>
-        </Card>
+              <div>
+                <h2 className="font-bold text-sm text-[#103342]">
+                  Reporting Scope
+                </h2>
 
-        <Card className="p-4 bg-[#FBF8F2] border-[#D8E6DA]">
-          <span className="text-[11px] font-medium text-[#294B57]">Overdue Doses</span>
-          <div className="text-2xl font-bold text-[#D9534F] mt-1">{totalOverdueDoses}</div>
-          <span className="text-[10px] text-[#294B57]/70 block mt-0.5">
-            {redUrgentFollowups} children in urgent red queue
-          </span>
-        </Card>
+                <p className="text-xs text-[#294B57] mt-2 leading-relaxed">
+                  These counts come from the database. They do not
+                  establish vaccination coverage, clinical risk,
+                  missed doses, or immunisation completion for
+                  individual children.
+                </p>
 
-        <Card className="p-4 bg-[#FBF8F2] border-[#D8E6DA]">
-          <span className="text-[11px] font-medium text-[#294B57]">Visit Requests</span>
-          <div className="text-2xl font-bold text-[#103342] mt-1">{pendingAppointments} Pending</div>
-          <span className="text-[10px] text-[#294B57]/70 block mt-0.5">
-            {confirmedAppointments} confirmed field visits
-          </span>
-        </Card>
-      </div>
+                <p className="text-xs text-[#294B57] mt-2 leading-relaxed">
+                  Verified village-level comparisons and worker
+                  workload breakdowns require additional backend
+                  aggregate reporting endpoints.
+                </p>
+              </div>
+            </div>
+          </Card>
+        </>
+      )}
 
-      {/* Village Comparison Table & Coverage Visualiser */}
-      <Card className="bg-[#FBF8F2] border-[#D8E6DA]">
-        <CardHeader
-          title="Village-Level Universal Immunisation Coverage (UIP India)"
-          subtitle="Bilaspur Sadar Block Cohort Monitoring • Derived from live child registry"
-        />
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-[#F0EBE1] border-b border-[#D8E6DA] text-[#294B57] uppercase tracking-wider font-semibold">
-              <tr>
-                <th className="py-3 px-4">Village / Locality</th>
-                <th className="py-3 px-3">0–5 Cohort Size</th>
-                <th className="py-3 px-3">Fully Immunised</th>
-                <th className="py-3 px-3">Coverage Rate (%)</th>
-                <th className="py-3 px-3">Coverage Bar</th>
-                <th className="py-3 px-3">Est. Drop-out Rate</th>
-                <th className="py-3 px-4">Overdue Doses</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#D8E6DA]/70 text-[#294B57]">
-              {villageStats.map((row) => (
-                <tr key={row.village} className="hover:bg-[#F0EBE1]/40 transition-colors">
-                  <td className="py-3.5 px-4 font-bold text-[#103342] font-serif">{row.village}</td>
-                  <td className="py-3.5 px-3 font-semibold">{row.cohort} children</td>
-                  <td className="py-3.5 px-3 text-[#007F68] font-bold">{row.fullyImmunised}</td>
-                  <td className="py-3.5 px-3">
-                    <span className="font-bold text-[#103342]">{row.coverage}%</span>
-                  </td>
-                  <td className="py-3.5 px-3 w-36">
-                    <div className="w-full bg-[#E5DFD4] h-2 rounded-full overflow-hidden">
-                      <div
-                        className="bg-[#007F68] h-full rounded-full"
-                        style={{ width: `${row.coverage}%` }}
-                      />
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-3 font-mono">{row.dropOutRate}%</td>
-                  <td className="py-3.5 px-4">
-                    <Badge variant={row.overdue > 0 ? 'overdue' : 'upToDate'}>
-                      {row.overdue} Doses Overdue
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      {!loading && !stats && !error && (
+        <p className="text-xs text-[#294B57]">
+          No analytics data is available.
+        </p>
+      )}
 
-      {/* Frontline Worker Workload Table */}
-      <Card className="bg-[#FBF8F2] border-[#D8E6DA]">
-        <CardHeader
-          title="Frontline Health Worker Workload Breakdown"
-          subtitle="ANM caseload, home visits, and urgent follow-up allocation"
-        />
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-[#F0EBE1] border-b border-[#D8E6DA] text-[#294B57] uppercase tracking-wider font-semibold">
-              <tr>
-                <th className="py-3 px-4">Worker Name</th>
-                <th className="py-3 px-3">Sub-Centre</th>
-                <th className="py-3 px-3">Assigned Children</th>
-                <th className="py-3 px-3">Pending Requests</th>
-                <th className="py-3 px-3">Confirmed Visits</th>
-                <th className="py-3 px-4">Urgent Outreach Queue</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#D8E6DA]/70 text-[#294B57]">
-              {workerWorkload.map((worker) => (
-                <tr key={worker.name} className="hover:bg-[#F0EBE1]/40 transition-colors">
-                  <td className="py-3.5 px-4 font-bold text-[#103342]">{worker.name}</td>
-                  <td className="py-3.5 px-3">{worker.subCentre}</td>
-                  <td className="py-3.5 px-3 font-bold text-[#007F68]">{worker.assignedChildren}</td>
-                  <td className="py-3.5 px-3 font-semibold">{worker.pendingAppointments}</td>
-                  <td className="py-3.5 px-3 font-semibold text-[#103342]">{worker.confirmedAppointments}</td>
-                  <td className="py-3.5 px-4">
-                    <Badge variant={worker.urgentFollowups > 0 ? 'overdue' : 'upToDate'}>
-                      {worker.urgentFollowups} Urgent Follow-ups
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <p className="text-[11px] text-[#294B57]/70">
+        NavJyoti hackathon prototype — use fictional test records only.
+      </p>
     </div>
   );
 }

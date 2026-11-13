@@ -1,321 +1,504 @@
+
 import React, { useState } from 'react';
 import { useHealthData } from '../../contexts/HealthDataContext';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
-import { CalendarCheck, Plus, Clock, User, AlertCircle, CheckCircle2, XCircle, Trash2 } from 'lucide-react';
+import {
+  CalendarCheck,
+  Plus,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+  Info,
+} from 'lucide-react';
+
+function localDateToday() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function statusLabel(status) {
+  const labels = {
+    requested: 'Pending Worker Review',
+    approved: 'Approved by Worker',
+    confirmed: 'Confirmed',
+    rescheduled: 'Rescheduled',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+    declined: 'Declined',
+    rejected: 'Rejected',
+  };
+
+  return labels[status] || status || 'Unknown';
+}
+
+function statusVariant(status) {
+  if (status === 'approved' || status === 'confirmed') {
+    return 'upToDate';
+  }
+
+  if (status === 'requested' || status === 'rescheduled') {
+    return 'dueSoon';
+  }
+
+  if (status === 'cancelled' || status === 'declined') {
+    return 'overdue';
+  }
+
+  return 'default';
+}
 
 export function ParentAppointmentsPage() {
-  const { appointments, activeChild, childrenList, requestAppointment, cancelAppointment } = useHealthData();
+  const {
+    appointments,
+    activeChild,
+    childrenList,
+    childrenLoading,
+    childrenError,
+    requestAppointment,
+  } = useHealthData();
+
   const [filterStatus, setFilterStatus] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Form states
-  const [selectedChildId, setSelectedChildId] = useState(activeChild?.id || childrenList[0]?.id || '');
+  const [selectedChildId, setSelectedChildId] = useState('');
   const [requestedDate, setRequestedDate] = useState('');
-  const [timeSlot, setTimeSlot] = useState('10:00 AM');
-  const [visitType, setVisitType] = useState('home_visit');
-  const [purpose, setPurpose] = useState('Routine UIP Immunisation & Growth Assessment');
+  const [purpose, setPurpose] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Min date for appointment is today
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = localDateToday();
 
-  const handleRequest = (e) => {
-    e.preventDefault();
+  // The backend stores child, date, reason and status.
+  // It does not currently store a preferred time or visit type.
+  const openRequestModal = () => {
+    setSelectedChildId(
+      String(activeChild?.id ?? childrenList[0]?.id ?? '')
+    );
+    setRequestedDate('');
+    setPurpose('Routine health visit');
     setErrorMsg('');
+    setSuccessMsg('');
+    setIsModalOpen(true);
+  };
+
+  const handleRequest = async (event) => {
+    event.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const child = childrenList.find(
+      (item) => String(item.id) === String(selectedChildId)
+    );
+
+    if (!child) {
+      setErrorMsg('Please select a child.');
+      return;
+    }
 
     if (!requestedDate) {
-      setErrorMsg('Please select a visit date.');
-      return;
-    }
-    if (requestedDate < todayStr) {
-      setErrorMsg('Cannot schedule an appointment in the past.');
+      setErrorMsg('Please select an appointment date.');
       return;
     }
 
-    const childObj = childrenList.find((c) => c.id === selectedChildId) || activeChild;
+    if (requestedDate < localDateToday()) {
+      setErrorMsg('Please choose today or a future date.');
+      return;
+    }
+
+    if (!purpose.trim()) {
+      setErrorMsg('Please enter the reason for the visit.');
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
-      requestAppointment({
-        childId: childObj.id,
-        childName: childObj.name,
-        caregiverName: childObj.caregiverName,
-        caregiverPhone: childObj.caregiverPhone,
+      // This function sends POST /children/{id}/appointments
+      // to FastAPI and waits for the database response.
+      await requestAppointment({
+        childId: child.id,
         requestedDate,
-        timeSlot,
-        visitType,
-        purpose,
-        assignedWorker: childObj.assignedWorker || "Rekha Devi (ANM)",
-        notes: "Awaiting frontline worker confirmation",
+        purpose: purpose.trim(),
       });
 
       setIsModalOpen(false);
-      setSuccessMsg(`Visit request submitted for ${childObj.name} on ${requestedDate}.`);
-      setTimeout(() => setSuccessMsg(''), 4000);
-    } catch (err) {
-      setErrorMsg(err.message || 'Error requesting appointment.');
+
+      setSuccessMsg(
+        `Appointment request for ${child.name} was saved. ` +
+        `A health worker must review it before confirmation.`
+      );
+
+      setRequestedDate('');
+      setPurpose('');
+    } catch (error) {
+      setErrorMsg(
+        error.message || 'Unable to save the appointment.'
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleCancel = (aptId, childName) => {
-    if (window.confirm(`Are you sure you want to cancel the appointment for ${childName}?`)) {
-      cancelAppointment(aptId, 'Cancelled by caregiver');
-      setSuccessMsg('Appointment cancelled.');
-      setTimeout(() => setSuccessMsg(''), 3000);
-    }
-  };
+  // Show only appointments belonging to accessible children.
+  const accessibleIds = new Set(
+    childrenList.map((child) => String(child.id))
+  );
 
-  const filteredAppointments = appointments.filter((apt) => {
-    if (filterStatus === 'all') return true;
-    if (filterStatus === 'confirmed') return apt.status === 'confirmed';
-    if (filterStatus === 'requested') return apt.status === 'requested';
-    if (filterStatus === 'history') return apt.status === 'completed' || apt.status === 'cancelled' || apt.status === 'declined';
-    return true;
-  });
+  const accessibleAppointments = appointments.filter(
+    (appointment) =>
+      accessibleIds.has(String(appointment.childId))
+  );
+
+  const filteredAppointments = accessibleAppointments.filter(
+    (appointment) => {
+      if (filterStatus === 'all') return true;
+
+      if (filterStatus === 'pending') {
+        return appointment.status === 'requested';
+      }
+
+      if (filterStatus === 'approved') {
+        return [
+          'approved',
+          'confirmed',
+          'rescheduled',
+        ].includes(appointment.status);
+      }
+
+      if (filterStatus === 'history') {
+        return [
+          'completed',
+          'cancelled',
+          'declined',
+          'rejected',
+        ].includes(appointment.status);
+      }
+
+      return true;
+    }
+  );
+
+  const sortedAppointments = [...filteredAppointments].sort(
+    (a, b) =>
+      String(b.requestedDate || '').localeCompare(
+        String(a.requestedDate || '')
+      )
+  );
+
+  const findChildName = (childId) => {
+    const child = childrenList.find(
+      (item) => String(item.id) === String(childId)
+    );
+
+    return child?.name || `Child ID ${childId}`;
+  };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto text-[#294B57]">
-      {/* Header */}
+
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#103342] font-serif">
             Frontline Appointments & Visits
           </h1>
-          <p className="text-xs text-[#294B57]">
-            Request home visits from your village ANM or schedule sub-centre check-ups
+
+          <p className="text-xs text-[#294B57] mt-1">
+            Request health worker appointments and track
+            their status through NavJyoti.
           </p>
         </div>
+
         <button
-          onClick={() => {
-            setErrorMsg('');
-            setIsModalOpen(true);
-          }}
-          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-[#007F68] text-white text-xs font-semibold hover:bg-[#005F52] transition-all shadow-xs cursor-pointer"
+          type="button"
+          onClick={openRequestModal}
+          disabled={childrenLoading || childrenList.length === 0}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#007F68] text-white text-xs font-semibold hover:bg-[#005F52] disabled:opacity-50 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>Request Health Worker Visit</span>
+          Request Health Worker Visit
         </button>
       </div>
 
+      {/* LOADING */}
+      {childrenLoading && (
+        <div className="p-4 bg-[#FBF8F2] rounded-xl border border-[#D8E6DA] text-xs">
+          Loading appointments from NavJyoti...
+        </div>
+      )}
+
+      {/* BACKEND ERROR */}
+      {childrenError && (
+        <div
+          role="alert"
+          className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex gap-2"
+        >
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{childrenError}</span>
+        </div>
+      )}
+
+      {/* SUCCESS MESSAGE */}
       {successMsg && (
-        <div className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-[#007F68] shrink-0" />
+        <div
+          role="status"
+          className="p-4 bg-[#DDF0E3] border border-[#A8D5B5] rounded-xl text-[#005F52] text-xs flex gap-2"
+        >
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
-      {/* Notice regarding confirmation */}
-      <div className="p-3.5 rounded-xl bg-[#F0EBE1] text-xs text-[#294B57] flex items-center gap-2 border border-[#D8E6DA]">
-        <AlertCircle className="w-4 h-4 text-[#007F68] shrink-0" />
-        <span>
-          <strong className="text-[#103342]">Health Visit Protocol:</strong> Requested visits are reviewed and accepted by your assigned frontline worker (ANM) before they are officially scheduled into the field round.
-        </span>
+      {/* DEVELOPMENT NOTICE */}
+      <div className="p-4 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] flex items-start gap-3 text-xs">
+        <Info className="w-5 h-5 text-[#007F68] shrink-0" />
+
+        <p>
+          <strong>Appointment workflow:</strong> Requests are
+          saved in PostgreSQL. A health worker must review
+          and approve them. Visit times, locations and
+          caregiver cancellation are not supported by the
+          current backend.
+        </p>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-1.5 p-1 bg-[#FBF8F2] border border-[#D8E6DA] rounded-xl text-xs font-medium w-fit">
-        <button
-          onClick={() => setFilterStatus('all')}
-          className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-            filterStatus === 'all' ? 'bg-[#103342] text-white font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
-          }`}
-        >
-          All ({appointments.length})
-        </button>
-        <button
-          onClick={() => setFilterStatus('confirmed')}
-          className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-            filterStatus === 'confirmed' ? 'bg-[#007F68] text-white font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
-          }`}
-        >
-          Confirmed ({appointments.filter(a => a.status === 'confirmed').length})
-        </button>
-        <button
-          onClick={() => setFilterStatus('requested')}
-          className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-            filterStatus === 'requested' ? 'bg-[#F4B83F] text-[#103342] font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
-          }`}
-        >
-          Pending ({appointments.filter(a => a.status === 'requested').length})
-        </button>
-        <button
-          onClick={() => setFilterStatus('history')}
-          className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-            filterStatus === 'history' ? 'bg-[#F0EBE1] text-[#103342] font-bold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
-          }`}
-        >
-          Past / Completed
-        </button>
+      {/* STATUS FILTERS */}
+      <div className="flex flex-wrap items-center gap-2">
+
+        {[
+          ['all', 'All'],
+          ['pending', 'Pending'],
+          ['approved', 'Approved'],
+          ['history', 'History'],
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setFilterStatus(value)}
+            className={`px-4 py-2 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
+              filterStatus === value
+                ? 'bg-[#103342] border-[#103342] text-white'
+                : 'bg-[#FBF8F2] border-[#D8E6DA] text-[#294B57]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+
       </div>
 
-      {/* Appointments List */}
+      {/* DATABASE APPOINTMENTS */}
       <div className="space-y-4">
-        {filteredAppointments.length === 0 ? (
-          <div className="p-8 text-center text-xs text-[#294B57] bg-[#FBF8F2] rounded-2xl border border-[#D8E6DA]">
-            No appointments found in this category.
-          </div>
+
+        {!childrenLoading &&
+        !childrenError &&
+        sortedAppointments.length === 0 ? (
+          <Card className="p-8 bg-[#FBF8F2] border-[#D8E6DA]">
+
+            <div className="text-center space-y-3">
+              <CalendarCheck className="w-10 h-10 text-[#007F68] mx-auto" />
+
+              <h3 className="font-bold text-[#103342]">
+                No Appointments Found
+              </h3>
+
+              <p className="text-xs text-[#294B57]">
+                No appointment records are available for
+                this category.
+              </p>
+            </div>
+
+          </Card>
         ) : (
-          filteredAppointments.map((apt) => (
-            <Card key={apt.id} className="p-5 bg-[#FBF8F2] border-[#D8E6DA] hover:border-[#007F68]/40 transition-colors">
+          sortedAppointments.map((appointment) => (
+
+            <Card
+              key={appointment.id}
+              className="p-5 bg-[#FBF8F2] border-[#D8E6DA]"
+            >
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                    apt.status === 'confirmed' ? 'bg-[#DDF0E3] text-[#007F68]' :
-                    apt.status === 'completed' ? 'bg-[#103342] text-white' :
-                    apt.status === 'cancelled' || apt.status === 'declined' ? 'bg-red-50 text-red-500' :
-                    'bg-[#FDF8EF] text-[#B87D14]'
-                  }`}>
+
+                <div className="flex items-start gap-3">
+
+                  <div className="w-10 h-10 rounded-xl bg-[#DDF0E3] text-[#007F68] flex items-center justify-center shrink-0">
                     <CalendarCheck className="w-5 h-5" />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm text-[#103342] font-serif">{apt.purpose}</h3>
-                      {apt.status === 'confirmed' && <Badge variant="upToDate">Confirmed by Worker</Badge>}
-                      {apt.status === 'requested' && <Badge variant="dueSoon">Pending Acceptance</Badge>}
-                      {apt.status === 'completed' && <Badge variant="navy">Completed</Badge>}
-                      {apt.status === 'cancelled' && <Badge variant="overdue">Cancelled</Badge>}
-                      {apt.status === 'declined' && <Badge variant="overdue">Declined</Badge>}
-                    </div>
-                    <p className="text-xs text-[#294B57] mt-1">
-                      For: <strong className="text-[#103342]">{apt.childName}</strong> • Visit Type:{' '}
-                      <span className="capitalize font-medium">{apt.visitType.replace('_', ' ')}</span>
+
+                  <div className="space-y-2">
+
+                    <h3 className="font-bold text-sm text-[#103342]">
+                      {appointment.purpose ||
+                        appointment.reason ||
+                        'Health Visit'}
+                    </h3>
+
+                    <p className="text-xs text-[#294B57]">
+                      For:{' '}
+                      <strong>
+                        {findChildName(appointment.childId)}
+                      </strong>
                     </p>
-                    <div className="mt-2 text-[11px] text-[#294B57]/80 flex flex-wrap items-center gap-3">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-[#007F68]" />
-                        {apt.requestedDate} at {apt.timeSlot}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <User className="w-3.5 h-3.5 text-[#007F68]" />
-                        ANM: {apt.assignedWorker}
-                      </span>
-                    </div>
-                    {apt.notes && (
-                      <p className="text-[11px] text-[#294B57]/80 mt-1 italic">Note: "{apt.notes}"</p>
-                    )}
+
+                    <p className="text-xs text-[#294B57] flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-[#007F68]" />
+                      Date: {appointment.requestedDate || 'Not recorded'}
+                    </p>
+
+                    <p className="text-[11px] text-[#294B57]/70">
+                      Database Appointment ID: {appointment.id}
+                    </p>
+
                   </div>
                 </div>
 
-                {/* Actions */}
-                {(apt.status === 'requested' || apt.status === 'confirmed') && (
-                  <div className="shrink-0 flex items-center gap-2">
-                    <button
-                      onClick={() => handleCancel(apt.id, apt.childName)}
-                      className="px-3 py-1.5 rounded-full bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Cancel</span>
-                    </button>
-                  </div>
-                )}
+                <div>
+                  <Badge variant={statusVariant(appointment.status)}>
+                    {statusLabel(appointment.status)}
+                  </Badge>
+                </div>
+
               </div>
+
             </Card>
+
           ))
         )}
+
       </div>
 
-      {/* Request Visit Modal */}
+      {/* REQUEST APPOINTMENT MODAL */}
       <Modal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          if (!isSubmitting) setIsModalOpen(false);
+        }}
         title="Request Frontline Health Visit"
-        subtitle="Coordinate a home visit or Sub-Centre checkup with your village ANM"
+        subtitle="Submit an appointment request to NavJyoti"
       >
-        <form onSubmit={handleRequest} className="space-y-4 text-xs text-[#294B57]">
+
+        <form
+          onSubmit={handleRequest}
+          className="space-y-4 text-xs text-[#294B57]"
+        >
+
           {errorMsg && (
-            <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-              <span>{errorMsg}</span>
+            <div
+              role="alert"
+              className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 flex gap-2"
+            >
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {errorMsg}
             </div>
           )}
 
           <div>
-            <label className="block font-semibold text-[#103342] mb-1">Select Child *</label>
-            <select
-              value={selectedChildId}
-              onChange={(e) => setSelectedChildId(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
+            <label
+              htmlFor="appointment-child"
+              className="block font-semibold text-[#103342] mb-1.5"
             >
-              {childrenList.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.id})
+              Select Child
+            </label>
+
+            <select
+              id="appointment-child"
+              required
+              disabled={isSubmitting}
+              value={selectedChildId}
+              onChange={(e) =>
+                setSelectedChildId(e.target.value)
+              }
+              className="w-full px-3 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
+            >
+              {childrenList.map((child) => (
+                <option key={child.id} value={String(child.id)}>
+                  {child.name}
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-[#103342] mb-1">Visit Date *</label>
-              <input
-                type="date"
-                min={todayStr}
-                required
-                value={requestedDate}
-                onChange={(e) => setRequestedDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-[#103342] mb-1">Preferred Time *</label>
-              <select
-                value={timeSlot}
-                onChange={(e) => setTimeSlot(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
-              >
-                <option value="09:00 AM">09:00 AM (Morning Round)</option>
-                <option value="10:30 AM">10:30 AM (Morning Round)</option>
-                <option value="12:00 PM">12:00 PM (Noon Round)</option>
-                <option value="02:30 PM">02:30 PM (Afternoon Round)</option>
-                <option value="04:00 PM">04:00 PM (Evening Session)</option>
-              </select>
-            </div>
-          </div>
-
           <div>
-            <label className="block font-semibold text-[#103342] mb-1">Visit Location / Type</label>
-            <select
-              value={visitType}
-              onChange={(e) => setVisitType(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
+            <label
+              htmlFor="appointment-date"
+              className="block font-semibold text-[#103342] mb-1.5"
             >
-              <option value="home_visit">Home Visit (ASHA / ANM visits household)</option>
-              <option value="subcentre">Village Sub-Centre (In-clinic appointment)</option>
-              <option value="vhnd_session">VHND Weekly Wednesday Drive</option>
-            </select>
-          </div>
+              Requested Visit Date
+            </label>
 
-          <div>
-            <label className="block font-semibold text-[#103342] mb-1">Purpose / Details</label>
             <input
-              type="text"
+              id="appointment-date"
+              type="date"
               required
-              value={purpose}
-              onChange={(e) => setPurpose(e.target.value)}
-              placeholder="e.g. Scheduled 9-month MR-1 vaccination catch-up"
-              className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
+              min={todayStr}
+              disabled={isSubmitting}
+              value={requestedDate}
+              onChange={(e) =>
+                setRequestedDate(e.target.value)
+              }
+              className="w-full px-3 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
             />
           </div>
 
-          <div className="pt-2 flex justify-end gap-2">
+          <div>
+            <label
+              htmlFor="appointment-purpose"
+              className="block font-semibold text-[#103342] mb-1.5"
+            >
+              Reason for Visit
+            </label>
+
+            <textarea
+              id="appointment-purpose"
+              required
+              rows={3}
+              disabled={isSubmitting}
+              value={purpose}
+              onChange={(e) =>
+                setPurpose(e.target.value)
+              }
+              placeholder="Describe the reason for the visit"
+              className="w-full px-3 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
+            />
+          </div>
+
+          <div className="p-3 rounded-xl bg-[#FDF8EF] border border-[#F4B83F]/50 text-[#294B57]">
+            Submitting a request does not confirm the
+            appointment. Confirmation requires health worker
+            approval.
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 rounded-xl bg-white border border-[#D8E6DA] text-[#103342] font-semibold text-xs cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-white border border-[#D8E6DA] text-[#103342] font-semibold cursor-pointer disabled:opacity-50"
             >
-              Cancel
+              Close
             </button>
+
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] transition-all cursor-pointer shadow-xs"
+              disabled={isSubmitting}
+              className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold hover:bg-[#005F52] cursor-pointer disabled:opacity-50"
             >
-              Submit Visit Request
+              {isSubmitting
+                ? 'Saving Request...'
+                : 'Submit Visit Request'}
             </button>
+
           </div>
         </form>
+
       </Modal>
+
     </div>
   );
 }

@@ -1,158 +1,182 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  initializeStorage,
-  getSession,
-  saveSession,
-  clearSession,
-  getAccounts,
-  findAccountByPhoneOrId,
-  createOrUpdateAccount,
-  DEFAULT_ACCOUNTS,
-} from '../services/storage';
+
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from 'react';
+
+import { backendApi } from '../services/backendApi';
 
 const AuthContext = createContext(null);
+
+const TOKEN_KEY = 'navjyoti_access_token';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize storage & restore persistent demo session on mount
+  // Restore and verify login after refreshing the page
   useEffect(() => {
-    initializeStorage();
-    const existingSession = getSession();
+    let active = true;
 
-    if (existingSession) {
-      // Find full profile from persistent accounts
-      const accounts = getAccounts();
-      const matched = accounts.find((a) => a.id === existingSession.userId);
+    async function restoreSession() {
+      const token = sessionStorage.getItem(TOKEN_KEY);
 
-      if (matched) {
-        setUser(matched);
-      } else {
-        // Fallback to session details
-        setUser({
-          id: existingSession.userId,
-          role: existingSession.role,
-          name: existingSession.name,
-          phone: existingSession.phone,
-          workerId: existingSession.workerId,
-          designation: existingSession.designation,
-          jurisdiction: existingSession.jurisdiction,
-          isSimulated: true,
-        });
+      if (!token) {
+        if (active) setIsLoading(false);
+        return;
+      }
+
+      try {
+        const profile = await backendApi.getProfile(token);
+
+        if (active) {
+          setUser(profile);
+        }
+      } catch (error) {
+        sessionStorage.removeItem(TOKEN_KEY);
+
+        if (active) {
+          setUser(null);
+        }
+      } finally {
+        if (active) setIsLoading(false);
       }
     }
-    setIsLoading(false);
+
+    restoreSession();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  // 1-Click Demo Login for any role (parent, worker, supervisor)
-  const loginWithDemo = (roleKey = 'parent') => {
-    const accounts = getAccounts();
-    const targetRole = roleKey === 'supervisor' ? 'supervisor' : roleKey === 'worker' ? 'worker' : 'parent';
-    const demoAccount = accounts.find((a) => a.role === targetRole) || DEFAULT_ACCOUNTS.find((a) => a.role === targetRole) || DEFAULT_ACCOUNTS[0];
+  // Real email and password login
+  const login = useCallback(async (email, password) => {
+    const result = await backendApi.login(
+      email.trim(),
+      password
+    );
 
-    saveSession(demoAccount);
-    setUser(demoAccount);
-    return demoAccount;
-  };
+    const token = result.access_token;
 
-  // Login with Mobile or Worker ID
-  const loginWithIdentifier = (identifier, role = 'parent') => {
-    const existing = findAccountByPhoneOrId(identifier, role);
+    // Verify token before accepting the session
+    const profile = await backendApi.getProfile(token);
 
-    let activeUser;
-    if (existing) {
-      activeUser = existing;
-    } else {
-      // Create new persistent demo account
-      const newAcc = {
-        id: `usr_${role}_${Date.now()}`,
-        role: role,
-        name: role === 'parent' ? "Demo Caregiver" : role === 'supervisor' ? "Dr. Demo Supervisor" : "Demo Health Worker",
-        phone: identifier,
-        workerId: role !== 'parent' ? identifier : undefined,
-        village: "Rampur",
-        district: "Bilaspur Sadar",
-        state: "Uttar Pradesh",
-        linkedChildIds: [],
-        createdAt: new Date().toISOString(),
-        isSimulated: true,
-      };
-      createOrUpdateAccount(newAcc);
-      activeUser = newAcc;
+    sessionStorage.setItem(TOKEN_KEY, token);
+    setUser(profile);
+
+    return profile;
+  }, []);
+
+  // Register a real parent account
+  const register = useCallback(
+    async ({ name, email, password }) => {
+      if (!name || !email || !password) {
+        throw new Error(
+          'Name, email and password are required.'
+        );
+      }
+
+      const newUser = await backendApi.register(
+        name.trim(),
+        email.trim(),
+        password
+      );
+
+      await login(email, password);
+
+      return newUser;
+    },
+    [login]
+  );
+
+  // Compatibility method for existing login components
+  const loginWithIdentifier = async (
+    identifier,
+    role = 'parent',
+    password
+  ) => {
+    if (!identifier?.includes('@') || !password) {
+      throw new Error(
+        'Please use your email address and password.'
+      );
     }
 
-    saveSession(activeUser);
-    setUser(activeUser);
-    return activeUser;
+    const profile = await login(identifier, password);
+
+    if (profile.role !== role) {
+      sessionStorage.removeItem(TOKEN_KEY);
+      setUser(null);
+
+      throw new Error(
+        'This account does not have the selected role.'
+      );
+    }
+
+    return profile;
   };
 
-  // Simplified Parent Registration
-  const registerCaregiver = ({ name, phone, language = 'en', consent = true }) => {
-    const newAccount = {
-      id: `usr_parent_${Date.now()}`,
-      role: 'parent',
-      name: name.trim(),
-      phone: phone.trim(),
-      language,
-      consent,
-      village: "Rampur",
-      district: "Bilaspur Sadar",
-      state: "Uttar Pradesh",
-      linkedChildIds: [],
-      createdAt: new Date().toISOString(),
-      isSimulated: true,
-    };
-
-    createOrUpdateAccount(newAccount);
-    saveSession(newAccount);
-    setUser(newAccount);
-    return newAccount;
+  // Compatibility method for parent registration
+  const registerCaregiver = async (data) => {
+    return register(data);
   };
 
-  // Update profile
-  const updateProfile = (patchData) => {
-    if (!user) return null;
-    const updated = { ...user, ...patchData };
-    createOrUpdateAccount(updated);
-    saveSession(updated);
-    setUser(updated);
-    return updated;
+  // Demo authentication is disabled for real accounts
+  const loginWithDemo = () => {
+    throw new Error(
+      'Demo login is disabled. Please log in with a registered account.'
+    );
   };
 
-  // Request password reset (simulated)
-  const requestPasswordReset = (identifier) => {
-    return {
-      success: true,
-      message: `Demo notice: Simulated reset instructions dispatched for ${identifier}. Non-operational until backend integration.`,
-    };
+  const switchRole = () => {
+    throw new Error(
+      'Your role is assigned by the backend. Log in with an authorized account.'
+    );
   };
 
-  // Explicit Logout: Clears active session ONLY. Saved child records and accounts are strictly preserved!
-  const logout = () => {
-    clearSession();
+  // Profile editing needs its own backend endpoint
+  const updateProfile = async () => {
+    throw new Error(
+      'Profile editing is not connected yet.'
+    );
+  };
+
+  // Password recovery needs a real backend workflow
+  const requestPasswordReset = async () => {
+    throw new Error(
+      'Password recovery is not available yet.'
+    );
+  };
+
+  const logout = useCallback(() => {
+    sessionStorage.removeItem(TOKEN_KEY);
     setUser(null);
-  };
-
-  const switchRole = (newRole) => {
-    return loginWithDemo(newRole);
-  };
+  }, []);
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        role: user ? user.role : null,
-        isAuthenticated: !!user,
+        role: user?.role ?? null,
+        isAuthenticated: Boolean(user),
         isLoading,
-        loginWithDemo,
+
+        login,
+        register,
+
         loginWithIdentifier,
+        loginWithDemo,
         registerCaregiver,
+
         updateProfile,
         requestPasswordReset,
         logout,
         switchRole,
-        isSimulated: true,
+
+        isSimulated: false,
       }}
     >
       {children}
@@ -162,8 +186,12 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
+
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error(
+      'useAuth must be used within an AuthProvider'
+    );
   }
+
   return context;
 }

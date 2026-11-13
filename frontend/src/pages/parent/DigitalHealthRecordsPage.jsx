@@ -1,319 +1,578 @@
+
 import React, { useState } from 'react';
 import { useHealthData } from '../../contexts/HealthDataContext';
-import { QRCodeSVG } from 'qrcode.react';
 import { Card } from '../../components/common/Card';
-import { Badge } from '../../components/common/Badge';
-import { Download, Printer, ShieldCheck, CheckCircle2, TrendingUp, Calendar, ArrowLeft } from 'lucide-react';
+
+import {
+  Download,
+  Printer,
+  CheckCircle2,
+  Activity,
+  Calendar,
+  Info,
+  ShieldCheck,
+} from 'lucide-react';
+
+// Calculate completed months at the time of measurement
+function calculateAgeMonths(dateOfBirth, measurementDate) {
+  if (!dateOfBirth || !measurementDate) return null;
+
+  const dob = new Date(`${dateOfBirth.slice(0, 10)}T00:00:00`);
+  const measured = new Date(
+    `${measurementDate.slice(0, 10)}T00:00:00`
+  );
+
+  if (
+    Number.isNaN(dob.getTime()) ||
+    Number.isNaN(measured.getTime()) ||
+    measured < dob
+  ) {
+    return null;
+  }
+
+  let months =
+    (measured.getFullYear() - dob.getFullYear()) * 12 +
+    measured.getMonth() -
+    dob.getMonth();
+
+  if (measured.getDate() < dob.getDate()) {
+    months -= 1;
+  }
+
+  return Math.max(0, months);
+}
+
+// Display missing values without inventing data
+function displayValue(value, suffix = '') {
+  if (value === null || value === undefined || value === '') {
+    return 'Not recorded';
+  }
+
+  return `${value}${suffix}`;
+}
 
 export function DigitalHealthRecordsPage() {
-  const { activeChild } = useHealthData();
+  const {
+    activeChild,
+    childrenLoading,
+    childrenError,
+  } = useHealthData();
+
+  const [activeTab, setActiveTab] = useState('pass');
   const [downloadNotice, setDownloadNotice] = useState(false);
-  const [activeTab, setActiveTab] = useState('pass'); // 'pass' | 'growth' | 'visits'
 
-  if (!activeChild) return null;
+  if (childrenLoading) {
+    return (
+      <div className="p-8 text-center text-[#294B57]">
+        Loading health records...
+      </div>
+    );
+  }
 
-  const qrUrl = `${window.location.origin}/records/lookup/${activeChild.qrToken || 'demo_token'}`;
+  if (childrenError) {
+    return (
+      <div className="p-8 text-center text-red-700">
+        Unable to load health records: {childrenError}
+      </div>
+    );
+  }
+
+  if (!activeChild) {
+    return (
+      <div className="p-8 text-center text-[#294B57]">
+        Please select a child to view health records.
+      </div>
+    );
+  }
+
+  const growthRecords = activeChild.growthRecords || [];
+  const doses = activeChild.doses || [];
+  const visitHistory = activeChild.visitHistory || [];
+
+  const administeredDoses = doses.filter(
+    (dose) => dose.status === 'administered'
+  );
+
+  const childDob =
+    activeChild.dob ||
+    activeChild.date_of_birth ||
+    null;
 
   const handlePrint = () => {
     window.print();
   };
 
   const handleDownload = () => {
-    // Generate simple structured text summary for download demo
-    const summary = `NAVJYOTI DIGITAL CHILD HEALTH PASS
+    const growthSummary = growthRecords.length
+      ? growthRecords.map((g) => {
+          const age = calculateAgeMonths(childDob, g.date);
+
+          return [
+            `Date: ${displayValue(g.date)}`,
+            `Age: ${age === null ? 'Not available' : `${age} months (calculated)`}`,
+            `Weight: ${displayValue(g.weightKg, ' kg')}`,
+            `Height: ${displayValue(g.heightCm, ' cm')}`,
+            `Head circumference: ${displayValue(g.headCircumferenceCm, ' cm')}`,
+          ].join(' | ');
+        }).join('\n')
+      : 'No growth records available';
+
+    const vaccineSummary = doses.length
+      ? doses.map((d) => (
+          `${displayValue(d.vaccineName || d.name)}: ` +
+          `${displayValue(d.status)} ` +
+          `(${displayValue(d.dateAdministered)})`
+        )).join('\n')
+      : 'No vaccination records available';
+
+    const summary = `NAVJYOTI - DEVELOPMENT HEALTH RECORD
 ----------------------------------------
-Child Name: ${activeChild.name}
+This is a development prototype, not an official
+or clinically verified health record.
+
+CHILD INFORMATION
+Name: ${activeChild.name}
 Child ID: ${activeChild.id}
-DOB: ${activeChild.dob} (${activeChild.ageMonths} Months)
-Gender: ${activeChild.gender}
-Blood Group: ${activeChild.bloodGroup || 'B+'}
-Caregiver: ${activeChild.caregiverName} (${activeChild.caregiverPhone})
-Village: ${activeChild.village}
-Sub-Centre: ${activeChild.subCentre}
-PHC: ${activeChild.phc}
+Date of Birth: ${displayValue(childDob)}
+Gender: ${displayValue(activeChild.gender)}
+Blood Group: ${displayValue(activeChild.bloodGroup)}
+Caregiver: ${displayValue(activeChild.caregiverName)}
 
-UIP IMMUNISATION DOSES:
-${activeChild.doses?.map(d => `- ${d.vaccineName}: ${d.status.toUpperCase()} ${d.dateAdministered ? `(${d.dateAdministered})` : ''}`).join('\n')}
+VACCINATION DATABASE RECORDS
+${vaccineSummary}
 
-GROWTH MEASUREMENTS:
-${activeChild.growthRecords?.map(g => `- Age ${g.ageMonths}m: ${g.weightKg} kg, ${g.heightCm} cm`).join('\n') || 'None recorded'}
+The complete vaccination schedule has not
+been verified.
 
-Generated from NavJyoti Healthcare Platform (Simulated Record)`;
+GROWTH MEASUREMENTS
+${growthSummary}
 
-    const blob = new Blob([summary], { type: 'text/plain' });
+Generated for development testing only.
+Keep this file private.
+`;
+
+    const blob = new Blob([summary], {
+      type: 'text/plain;charset=utf-8',
+    });
+
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `navjyoti_health_pass_${activeChild.id}.txt`;
-    a.click();
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download =
+      `navjyoti_health_record_${activeChild.id}.txt`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
 
     setDownloadNotice(true);
-    setTimeout(() => setDownloadNotice(false), 3000);
   };
-
-  const administeredDoses = activeChild.doses?.filter(d => d.status === 'administered') || [];
-  const growthRecords = activeChild.growthRecords || [];
-  const visitHistory = activeChild.visitHistory || [];
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto text-[#294B57]">
-      {/* Header */}
+
+      {/* PAGE HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+
         <div>
           <h1 className="text-2xl font-bold text-[#103342] font-serif">
             Digital Child Health Pass
           </h1>
+
           <p className="text-xs text-[#294B57]">
-            Portable, non-sensitive health record pass for {activeChild.name} (ID: {activeChild.id})
+            Development record for {activeChild.name}
+            {' '}(ID: {activeChild.id})
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+
           <button
+            type="button"
             onClick={handleDownload}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FBF8F2] border border-[#D8E6DA] text-xs font-semibold text-[#103342] hover:bg-white transition-colors shadow-2xs cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FBF8F2] border border-[#D8E6DA] text-xs font-semibold text-[#103342] hover:bg-white cursor-pointer"
           >
             <Download className="w-4 h-4 text-[#007F68]" />
-            <span>Download Summary</span>
+            Download Summary
           </button>
+
           <button
+            type="button"
             onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#007F68] text-white text-xs font-semibold hover:bg-[#005F52] transition-colors shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#007F68] text-white text-xs font-semibold hover:bg-[#005F52] cursor-pointer"
           >
             <Printer className="w-4 h-4" />
-            <span>Print Pass</span>
+            Print Pass
           </button>
+
         </div>
       </div>
 
+      {/* DEVELOPMENT NOTICE */}
+      <div className="p-4 rounded-xl bg-[#FDF8EF] border border-[#F4B83F]/60 text-xs text-[#294B57] flex gap-3">
+        <Info className="w-5 h-5 text-[#B87D14] shrink-0" />
+
+        <p>
+          This is a development prototype, not an official
+          verified health card. Only use fictional test data
+          for hackathon demonstrations. Downloaded or printed
+          records must be kept private.
+        </p>
+      </div>
+
       {downloadNotice && (
-        <div className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-[#007F68]" />
-          <span>Demo Health Pass Summary successfully exported for {activeChild.name}!</span>
+        <div className="p-3 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4" />
+          Development record summary exported.
         </div>
       )}
 
-      {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-[#D8E6DA] text-xs font-semibold">
+      {/* NAVIGATION TABS */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#D8E6DA] text-xs font-semibold">
+
         <button
+          type="button"
           onClick={() => setActiveTab('pass')}
-          className={`py-2.5 px-4 border-b-2 transition-all cursor-pointer ${
+          className={`py-3 px-4 border-b-2 cursor-pointer ${
             activeTab === 'pass'
               ? 'border-[#007F68] text-[#007F68]'
-              : 'border-transparent text-[#294B57] hover:text-[#103342]'
+              : 'border-transparent text-[#294B57]'
           }`}
         >
-          Digital Pass & QR
+          Digital Pass
         </button>
+
         <button
+          type="button"
           onClick={() => setActiveTab('growth')}
-          className={`py-2.5 px-4 border-b-2 transition-all cursor-pointer ${
+          className={`py-3 px-4 border-b-2 cursor-pointer ${
             activeTab === 'growth'
               ? 'border-[#007F68] text-[#007F68]'
-              : 'border-transparent text-[#294B57] hover:text-[#103342]'
+              : 'border-transparent text-[#294B57]'
           }`}
         >
           Growth Trajectory ({growthRecords.length})
         </button>
+
         <button
+          type="button"
           onClick={() => setActiveTab('visits')}
-          className={`py-2.5 px-4 border-b-2 transition-all cursor-pointer ${
+          className={`py-3 px-4 border-b-2 cursor-pointer ${
             activeTab === 'visits'
               ? 'border-[#007F68] text-[#007F68]'
-              : 'border-transparent text-[#294B57] hover:text-[#103342]'
+              : 'border-transparent text-[#294B57]'
           }`}
         >
           Recorded Visits ({visitHistory.length})
         </button>
+
       </div>
 
+      {/* DIGITAL PASS TAB */}
       {activeTab === 'pass' && (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          {/* Left: Printable ID Card */}
+
           <div className="md:col-span-7">
             <Card className="p-6 bg-[#FBF8F2] border-2 border-[#D8E6DA]">
-              <div className="flex items-start justify-between border-b border-[#D8E6DA] pb-4 mb-4">
+
+              <div className="flex items-center justify-between border-b border-[#D8E6DA] pb-4 mb-4">
+
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-white p-0.5 overflow-hidden border border-[#D8E6DA] flex items-center justify-center">
-                    <img src="/logo.jpg" alt="NavJyoti" className="w-full h-full object-cover scale-115 object-center" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-[#103342] font-serif">NavJyoti Health Pass</h3>
-                    <span className="text-[10px] uppercase tracking-wider text-[#007F68] font-bold block">
-                      Ministry of Health & Family Welfare Aligned
-                    </span>
-                  </div>
-                </div>
-                <Badge variant="upToDate">Verified Record</Badge>
-              </div>
+                  <img
+                    src="/logo.jpg"
+                    alt="NavJyoti"
+                    className="w-12 h-12 rounded-xl object-cover"
+                  />
 
-              <div className="space-y-4 text-xs">
-                <div className="grid grid-cols-2 gap-3 p-3.5 bg-white rounded-xl border border-[#D8E6DA]">
                   <div>
-                    <span className="text-[#294B57]/70 block text-[10px] uppercase font-semibold">Child Full Name</span>
-                    <span className="font-bold text-[#103342] text-sm font-serif">{activeChild.name}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#294B57]/70 block text-[10px] uppercase font-semibold">Child Unique ID</span>
-                    <span className="font-mono font-bold text-[#007F68]">{activeChild.id}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#294B57]/70 block text-[10px] uppercase font-semibold">Date of Birth / Age</span>
-                    <span className="font-semibold text-[#103342]">{activeChild.dob} ({activeChild.ageMonths} Months)</span>
-                  </div>
-                  <div>
-                    <span className="text-[#294B57]/70 block text-[10px] uppercase font-semibold">Blood Group & Gender</span>
-                    <span className="font-semibold text-[#103342]">{activeChild.bloodGroup || 'B+'} • {activeChild.gender}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#294B57]/70 block text-[10px] uppercase font-semibold">Caregiver</span>
-                    <span className="font-semibold text-[#103342]">{activeChild.caregiverName}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#294B57]/70 block text-[10px] uppercase font-semibold">Caregiver Phone</span>
-                    <span className="font-semibold text-[#103342]">{activeChild.caregiverPhone}</span>
+                    <h2 className="font-bold text-lg text-[#103342] font-serif">
+                      NavJyoti Health Pass
+                    </h2>
+
+                    <p className="text-[10px] font-semibold text-[#007F68]">
+                      Development Record
+                    </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 p-3.5 bg-white rounded-xl border border-[#D8E6DA]">
-                  <div>
-                    <span className="text-[#294B57]/70 block text-[10px] uppercase font-semibold">Assigned Village</span>
-                    <span className="font-semibold text-[#103342]">{activeChild.village}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#294B57]/70 block text-[10px] uppercase font-semibold">Sub-Centre / PHC</span>
-                    <span className="font-semibold text-[#103342]">{activeChild.subCentre}</span>
-                  </div>
-                </div>
-
-                <div className="p-3.5 bg-[#DDF0E3] rounded-xl border border-[#A8D5B5] text-[#005F52]">
-                  <div className="flex justify-between font-bold mb-1">
-                    <span>Universal Immunisation Coverage:</span>
-                    <span>{administeredDoses.length} of {activeChild.doses?.length} UIP Doses</span>
-                  </div>
-                  <div className="text-[11px] text-[#294B57]">
-                    Last Verified Dose: {administeredDoses[administeredDoses.length - 1]?.vaccineName || 'BCG'} on {administeredDoses[administeredDoses.length - 1]?.dateAdministered || activeChild.dob}
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Right: QR Code Security Box */}
-          <div className="md:col-span-5">
-            <Card className="p-6 bg-[#FBF8F2] border border-[#D8E6DA] text-center flex flex-col items-center justify-between h-full">
-              <div className="space-y-2">
-                <span className="text-[10px] uppercase tracking-wider font-bold text-[#294B57]/70">
-                  Non-Sensitive QR Reference
+                <span className="text-[10px] bg-[#F0EBE1] text-[#294B57] px-3 py-1 rounded-full">
+                  Not Clinically Verified
                 </span>
-                <h3 className="text-base font-bold text-[#103342] font-serif">Emergency Inter-Facility Scan</h3>
-                <p className="text-xs text-[#294B57] max-w-xs mx-auto">
-                  Contains only a non-sensitive token reference that opens the child's record safely across different state health centres.
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-xs bg-white p-4 rounded-xl border border-[#D8E6DA]">
+
+                <div>
+                  <p className="text-[#294B57]/70">Child Name</p>
+                  <p className="font-bold text-[#103342]">
+                    {activeChild.name}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[#294B57]/70">Child ID</p>
+                  <p className="font-bold text-[#103342]">
+                    {activeChild.id}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[#294B57]/70">Date of Birth</p>
+                  <p className="font-semibold">
+                    {displayValue(childDob)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[#294B57]/70">Gender</p>
+                  <p className="font-semibold">
+                    {displayValue(activeChild.gender)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[#294B57]/70">Blood Group</p>
+                  <p className="font-semibold">
+                    {displayValue(activeChild.bloodGroup)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[#294B57]/70">Caregiver</p>
+                  <p className="font-semibold">
+                    {displayValue(activeChild.caregiverName)}
+                  </p>
+                </div>
+
+              </div>
+
+              {/* VACCINATION SUMMARY */}
+              <div className="mt-4 p-4 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5]">
+
+                <div className="flex items-center gap-2 mb-2">
+                  <ShieldCheck className="w-4 h-4 text-[#007F68]" />
+
+                  <h3 className="font-bold text-sm text-[#103342]">
+                    Vaccination Database Summary
+                  </h3>
+                </div>
+
+                <p className="text-xs text-[#294B57]">
+                  {doses.length} recorded vaccination entries.
+                  {' '}{administeredDoses.length} marked administered.
                 </p>
-              </div>
 
-              <div className="p-4 my-6 bg-white rounded-2xl border-2 border-[#D8E6DA] shadow-xs inline-block">
-                <QRCodeSVG
-                  value={qrUrl}
-                  size={160}
-                  bgColor={"#ffffff"}
-                  fgColor={"#103342"}
-                  level={"M"}
-                  includeMargin={false}
-                />
-                <span className="block text-[10px] font-mono text-[#007F68] mt-2 font-bold">
-                  TOKEN: {activeChild.qrToken}
-                </span>
-              </div>
+                <p className="text-[11px] text-[#294B57] mt-2">
+                  Full age-appropriate vaccination coverage
+                  has not been verified.
+                </p>
 
-              <div className="w-full text-xs text-[#294B57] bg-[#F0EBE1] p-3 rounded-xl border border-[#D8E6DA]">
-                <ShieldCheck className="w-4 h-4 text-[#007F68] inline mr-1 -mt-0.5" />
-                <span>Zero sensitive health data encoded in QR matrix.</span>
               </div>
             </Card>
           </div>
+
+          {/* QR STATUS */}
+          <div className="md:col-span-5">
+
+            <Card className="p-6 bg-[#FBF8F2] border border-[#D8E6DA] h-full flex flex-col items-center justify-center text-center gap-4">
+
+              <ShieldCheck className="w-12 h-12 text-[#007F68]" />
+
+              <h3 className="font-bold text-lg text-[#103342] font-serif">
+                Secure QR Access
+              </h3>
+
+              <p className="text-xs text-[#294B57]">
+                QR record lookup is temporarily disabled
+                until a secure, authenticated backend
+                verification system is implemented.
+              </p>
+
+              <span className="px-4 py-2 bg-[#F0EBE1] rounded-full text-xs text-[#294B57] font-semibold">
+                Coming Soon
+              </span>
+
+            </Card>
+          </div>
+
         </div>
       )}
 
+      {/* GROWTH TRAJECTORY TAB */}
       {activeTab === 'growth' && (
+
         <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA]">
-          <div className="flex items-center justify-between mb-4">
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+
             <div>
               <h3 className="font-bold text-sm text-[#103342] font-serif">
                 Physical Growth Measurements
               </h3>
+
               <p className="text-xs text-[#294B57]">
-                Weight, length/height, and head circumference recorded at health visits
+                Measurements retrieved from your connected
+                database. No values are estimated.
               </p>
             </div>
-            <div className="text-xs font-semibold text-[#007F68] bg-[#DDF0E3] px-3 py-1 rounded-full">
-              Birth Weight: {activeChild.birthWeightKg || 3.1} kg
+
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#DDF0E3] text-[#007F68] text-xs font-semibold">
+              <Activity className="w-4 h-4" />
+              {growthRecords.length} records
             </div>
           </div>
 
           {growthRecords.length === 0 ? (
-            <div className="p-8 text-center text-xs text-[#294B57]">No growth records logged yet.</div>
+
+            <div className="p-8 text-center text-xs text-[#294B57]">
+              No growth records have been recorded yet.
+            </div>
+
           ) : (
+
             <div className="overflow-x-auto">
+
               <table className="w-full text-xs text-left">
-                <thead className="bg-[#F0EBE1] border-b border-[#D8E6DA] text-[#294B57] uppercase tracking-wider">
+
+                <thead className="bg-[#F0EBE1] border-b border-[#D8E6DA] text-[#294B57] uppercase">
+
                   <tr>
-                    <th className="py-2.5 px-3">Date</th>
-                    <th className="py-2.5 px-3">Age</th>
-                    <th className="py-2.5 px-3">Weight (kg)</th>
-                    <th className="py-2.5 px-3">Height (cm)</th>
-                    <th className="py-2.5 px-3">Head Circ. (cm)</th>
-                    <th className="py-2.5 px-3">Recorded By</th>
+                    <th className="py-3 px-3">Date</th>
+                    <th className="py-3 px-3">Age</th>
+                    <th className="py-3 px-3">Weight</th>
+                    <th className="py-3 px-3">Height</th>
+                    <th className="py-3 px-3">Head Circ.</th>
+                    <th className="py-3 px-3">Recorded By</th>
                   </tr>
+
                 </thead>
-                <tbody className="divide-y divide-[#D8E6DA]/70 text-[#294B57]">
-                  {growthRecords.map((g) => (
-                    <tr key={g.id} className="hover:bg-white/60">
-                      <td className="py-3 px-3 font-mono font-semibold text-[#103342]">{g.date}</td>
-                      <td className="py-3 px-3">{g.ageMonths} Months</td>
-                      <td className="py-3 px-3 font-bold text-[#007F68]">{g.weightKg} kg</td>
-                      <td className="py-3 px-3">{g.heightCm} cm</td>
-                      <td className="py-3 px-3">{g.headCircumferenceCm} cm</td>
-                      <td className="py-3 px-3 text-[#294B57]/80">{g.recordedBy}</td>
-                    </tr>
-                  ))}
+
+                <tbody className="divide-y divide-[#D8E6DA]/70">
+
+                  {growthRecords.map((g, index) => {
+
+                    // Calculate the age using the real dates
+                    const calculatedMonths = calculateAgeMonths(
+                      childDob,
+                      g.date
+                    );
+
+                    return (
+                      <tr
+                        key={g.id ?? index}
+                        className="hover:bg-white/60"
+                      >
+
+                        <td className="py-3 px-3 font-mono font-semibold text-[#103342]">
+                          {displayValue(g.date)}
+                        </td>
+
+                        <td className="py-3 px-3">
+                          {calculatedMonths === null
+                            ? 'Not available'
+                            : `${calculatedMonths} months (calculated)`}
+                        </td>
+
+                        <td className="py-3 px-3 font-bold text-[#007F68]">
+                          {displayValue(g.weightKg, ' kg')}
+                        </td>
+
+                        <td className="py-3 px-3">
+                          {displayValue(g.heightCm, ' cm')}
+                        </td>
+
+                        <td className="py-3 px-3">
+                          {displayValue(
+                            g.headCircumferenceCm,
+                            ' cm'
+                          )}
+                        </td>
+
+                        <td className="py-3 px-3">
+                          {displayValue(g.recordedBy)}
+                        </td>
+
+                      </tr>
+                    );
+                  })}
+
                 </tbody>
               </table>
+
             </div>
           )}
+
+          <p className="text-[11px] text-[#294B57]/70 mt-5">
+            Age is calculated from the recorded date of birth
+            and measurement date. Growth measurements themselves
+            are unchanged. Clinical interpretation requires
+            qualified health personnel.
+          </p>
+
         </Card>
       )}
 
+      {/* RECORDED VISITS TAB */}
       {activeTab === 'visits' && (
+
         <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA]">
+
           <h3 className="font-bold text-sm text-[#103342] font-serif mb-4">
             Recorded Clinical & Home Visits
           </h3>
+
           {visitHistory.length === 0 ? (
-            <div className="p-8 text-center text-xs text-[#294B57]">No clinical visits recorded yet.</div>
+
+            <div className="p-8 text-center text-xs text-[#294B57]">
+              No clinical visits recorded yet.
+            </div>
+
           ) : (
+
             <div className="space-y-3">
-              {visitHistory.map((vh) => (
-                <div key={vh.id} className="p-4 rounded-xl bg-white border border-[#D8E6DA] flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-[#DDF0E3] text-[#007F68] flex items-center justify-center shrink-0 mt-0.5">
-                    <Calendar className="w-4 h-4" />
-                  </div>
+
+              {visitHistory.map((visit, index) => (
+
+                <div
+                  key={visit.id ?? index}
+                  className="p-4 rounded-xl bg-white border border-[#D8E6DA] flex items-start gap-3"
+                >
+
+                  <Calendar className="w-5 h-5 text-[#007F68]" />
+
                   <div className="flex-1 text-xs">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-[#103342]">{vh.visitType}</h4>
-                      <span className="font-mono text-[10px] text-[#294B57]/70">{vh.date}</span>
-                    </div>
-                    <p className="text-[#294B57] mt-1">{vh.notes}</p>
-                    <span className="text-[10px] text-[#007F68] font-semibold block mt-1.5">
-                      Attending Provider: {vh.provider}
-                    </span>
+
+                    <h4 className="font-bold text-sm text-[#103342]">
+                      {displayValue(visit.visitType)}
+                    </h4>
+
+                    <p className="text-[#294B57] mt-1">
+                      {displayValue(visit.date)}
+                    </p>
+
+                    <p className="text-[#294B57] mt-1">
+                      {displayValue(visit.notes)}
+                    </p>
+
+                    <p className="text-[#007F68] mt-2">
+                      Provider: {displayValue(visit.provider)}
+                    </p>
+
                   </div>
+
                 </div>
+
               ))}
+
             </div>
           )}
+
         </Card>
       )}
+
     </div>
   );
 }

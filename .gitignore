@@ -4,3 +4,21 @@ dist/
 .env.*
 !.env.example
 *.log
+
+# Keep passwords and secrets private
+.env
+.env.*
+!.env.example
+
+# Python
+venv/
+.venv/
+__pycache__/
+
+# React
+node_modules/
+dist/
+
+# Local administrator account-creation scripts
+backend/create_supervisor.py
+backend/create_worker.py

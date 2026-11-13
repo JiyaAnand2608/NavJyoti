@@ -1,280 +1,555 @@
+
 import React, { useState } from 'react';
 import { useHealthData } from '../../contexts/HealthDataContext';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
-import { CalendarCheck, Check, X, Clock, CheckCircle2, RotateCw, AlertCircle } from 'lucide-react';
+
+import {
+  CalendarCheck,
+  Check,
+  X,
+  Clock,
+  CheckCircle2,
+  RotateCw,
+  AlertCircle,
+} from 'lucide-react';
+
+function getToday() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getStatusLabel(status) {
+  const labels = {
+    requested: 'Pending Acceptance',
+    approved: 'Approved',
+    confirmed: 'Confirmed',
+    completed: 'Completed',
+    rejected: 'Rejected',
+    declined: 'Declined',
+    cancelled: 'Cancelled',
+    rescheduled: 'Rescheduled',
+  };
+
+  return labels[status] || status || 'Unknown';
+}
+
+function getBadgeVariant(status) {
+  if (status === 'approved' || status === 'confirmed') {
+    return 'upToDate';
+  }
+
+  if (status === 'requested' || status === 'rescheduled') {
+    return 'dueSoon';
+  }
+
+  if (status === 'completed') {
+    return 'navy';
+  }
+
+  if (
+    status === 'rejected' ||
+    status === 'declined' ||
+    status === 'cancelled'
+  ) {
+    return 'overdue';
+  }
+
+  return 'default';
+}
 
 export function WorkerAppointmentsPage() {
-  const { appointments, updateAppointmentStatus, rescheduleAppointment } = useHealthData();
-  const [filterStatus, setFilterStatus] = useState('all');
+  const {
+    appointments = [],
+    childrenList = [],
+    childrenLoading,
+    childrenError,
+    updateAppointmentStatus,
+    rescheduleAppointment,
+    refreshChildren,
+  } = useHealthData();
 
-  // Reschedule modal
+  const [filterStatus, setFilterStatus] = useState('all');
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
   const [selectedApt, setSelectedApt] = useState(null);
   const [newDate, setNewDate] = useState('');
-  const [newTime, setNewTime] = useState('10:00 AM');
-  const [rescheduleReason, setRescheduleReason] = useState('VHND sector shift');
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [savingId, setSavingId] = useState(null);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getToday();
 
-  const handleOpenReschedule = (apt) => {
-    setSelectedApt(apt);
-    setNewDate(apt.requestedDate || todayStr);
-    setNewTime(apt.timeSlot || '10:00 AM');
-    setIsRescheduleOpen(true);
+  const assignedChildIds = new Set(
+    childrenList.map((child) => String(child.id))
+  );
+
+  const workerAppointments = appointments.filter((appointment) =>
+    assignedChildIds.has(String(appointment.childId))
+  );
+
+  const getChildName = (childId) => {
+    const child = childrenList.find(
+      (item) => String(item.id) === String(childId)
+    );
+
+    return child?.name || `Child ID ${childId}`;
   };
 
-  const handleSaveReschedule = (e) => {
-    e.preventDefault();
-    if (!selectedApt) return;
+  const filteredAppointments = workerAppointments.filter((appointment) => {
+    const status = appointment.status;
 
-    rescheduleAppointment(selectedApt.id, newDate, newTime, rescheduleReason);
-    setIsRescheduleOpen(false);
-    setSuccessMsg(`Appointment for ${selectedApt.childName} rescheduled to ${newDate} at ${newTime}.`);
-    setTimeout(() => setSuccessMsg(''), 4000);
-  };
-
-  const handleAccept = (aptId, childName) => {
-    updateAppointmentStatus(aptId, 'confirmed', 'Accepted by ANM for morning sector round');
-    setSuccessMsg(`Visit confirmed for ${childName}.`);
-    setTimeout(() => setSuccessMsg(''), 3000);
-  };
-
-  const handleDecline = (aptId, childName) => {
-    updateAppointmentStatus(aptId, 'declined', 'Declined: Please visit Sub-Centre during Wednesday VHND');
-    setSuccessMsg(`Visit declined for ${childName}.`);
-    setTimeout(() => setSuccessMsg(''), 3000);
-  };
-
-  const handleComplete = (aptId, childName) => {
-    updateAppointmentStatus(aptId, 'completed', 'Visit successfully conducted and dose administered');
-    setSuccessMsg(`Visit marked as completed for ${childName}.`);
-    setTimeout(() => setSuccessMsg(''), 3000);
-  };
-
-  const filteredAppointments = appointments.filter((apt) => {
     if (filterStatus === 'all') return true;
-    if (filterStatus === 'pending') return apt.status === 'requested';
-    if (filterStatus === 'confirmed') return apt.status === 'confirmed';
-    if (filterStatus === 'completed') return apt.status === 'completed';
+
+    if (filterStatus === 'pending') {
+      return status === 'requested';
+    }
+
+    if (filterStatus === 'approved') {
+      return status === 'approved' || status === 'confirmed';
+    }
+
+    if (filterStatus === 'history') {
+      return [
+        'completed',
+        'rejected',
+        'declined',
+        'cancelled',
+        'rescheduled',
+      ].includes(status);
+    }
+
     return true;
   });
 
+  const handleUpdateStatus = async (
+    appointment,
+    newStatus
+  ) => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    setSavingId(appointment.id);
+
+    try {
+      await updateAppointmentStatus(
+        appointment.id,
+        newStatus
+      );
+
+      setSuccessMsg(
+        `Appointment for ${getChildName(
+          appointment.childId
+        )} updated to ${getStatusLabel(newStatus)}.`
+      );
+
+      // Reload the latest records from PostgreSQL.
+      refreshChildren?.();
+
+    } catch (error) {
+      setErrorMsg(
+        error.message || 'Failed to update appointment.'
+      );
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleOpenReschedule = (appointment) => {
+    setSelectedApt(appointment);
+    setNewDate(appointment.requestedDate || todayStr);
+    setErrorMsg('');
+    setSuccessMsg('');
+    setIsRescheduleOpen(true);
+  };
+
+  const handleSaveReschedule = async (event) => {
+    event.preventDefault();
+
+    if (!selectedApt) return;
+
+    if (!newDate || newDate < getToday()) {
+      setErrorMsg('Please select a valid future date.');
+      return;
+    }
+
+    setSavingId(selectedApt.id);
+    setErrorMsg('');
+
+    try {
+      await rescheduleAppointment(
+        selectedApt.id,
+        newDate
+      );
+
+      setIsRescheduleOpen(false);
+      setSelectedApt(null);
+
+      setSuccessMsg(
+        `Appointment rescheduled to ${newDate}.`
+      );
+
+      refreshChildren?.();
+
+    } catch (error) {
+      setErrorMsg(
+        error.message || 'Unable to reschedule.'
+      );
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto text-[#294B57]">
+
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+
         <div>
           <h1 className="text-2xl font-bold text-[#103342] font-serif">
             Visit & Appointment Management
           </h1>
-          <p className="text-xs text-[#294B57]">
-            Review caregiver requests for home visits and VHND sub-centre sessions
+
+          <p className="text-xs text-[#294B57] mt-1">
+            Review requests and update appointments
+            for your assigned children.
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 p-1 bg-[#FBF8F2] border border-[#D8E6DA] rounded-xl text-xs font-medium">
-          <button
-            onClick={() => setFilterStatus('all')}
-            className={`px-3 py-1.5 rounded-lg cursor-pointer ${
-              filterStatus === 'all' ? 'bg-[#103342] text-white font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
-            }`}
-          >
-            All ({appointments.length})
-          </button>
-          <button
-            onClick={() => setFilterStatus('pending')}
-            className={`px-3 py-1.5 rounded-lg cursor-pointer ${
-              filterStatus === 'pending' ? 'bg-[#F4B83F] text-[#103342] font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
-            }`}
-          >
-            Pending Requests ({appointments.filter(a => a.status === 'requested').length})
-          </button>
-          <button
-            onClick={() => setFilterStatus('confirmed')}
-            className={`px-3 py-1.5 rounded-lg cursor-pointer ${
-              filterStatus === 'confirmed' ? 'bg-[#007F68] text-white font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
-            }`}
-          >
-            Confirmed ({appointments.filter(a => a.status === 'confirmed').length})
-          </button>
-          <button
-            onClick={() => setFilterStatus('completed')}
-            className={`px-3 py-1.5 rounded-lg cursor-pointer ${
-              filterStatus === 'completed' ? 'bg-[#103342] text-white font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
-            }`}
-          >
-            Completed ({appointments.filter(a => a.status === 'completed').length})
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => refreshChildren?.()}
+          disabled={childrenLoading || savingId !== null}
+          className="px-4 py-2 rounded-xl border border-[#D8E6DA] bg-[#FBF8F2] text-xs font-semibold text-[#007F68] hover:bg-white disabled:opacity-50 cursor-pointer flex items-center gap-2"
+        >
+          <RotateCw className="w-4 h-4" />
+          Refresh Records
+        </button>
+
       </div>
 
-      {successMsg && (
-        <div className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-[#007F68]" />
-          <span>{successMsg}</span>
+      {/* LOADING */}
+      {childrenLoading && (
+        <div className="p-4 rounded-xl bg-[#FBF8F2] border border-[#D8E6DA] text-xs">
+          Loading worker appointments...
         </div>
       )}
 
-      <div className="space-y-4">
-        {filteredAppointments.length === 0 ? (
-          <div className="p-12 text-center text-xs text-[#294B57] bg-[#FBF8F2] rounded-2xl border border-[#D8E6DA]">
-            No appointments in this category.
-          </div>
-        ) : (
-          filteredAppointments.map((apt) => (
-            <Card key={apt.id} className="p-5 bg-[#FBF8F2] border-[#D8E6DA]">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                    apt.status === 'confirmed' ? 'bg-[#DDF0E3] text-[#007F68]' :
-                    apt.status === 'completed' ? 'bg-[#103342] text-white' :
-                    apt.status === 'declined' || apt.status === 'cancelled' ? 'bg-red-50 text-red-500' :
-                    'bg-[#FDF8EF] text-[#B87D14]'
-                  }`}>
-                    <CalendarCheck className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm text-[#103342] font-serif">{apt.purpose}</h3>
-                      {apt.status === 'confirmed' && <Badge variant="upToDate">Confirmed</Badge>}
-                      {apt.status === 'completed' && <Badge variant="navy">Completed</Badge>}
-                      {apt.status === 'requested' && <Badge variant="dueSoon">Pending Acceptance</Badge>}
-                      {apt.status === 'declined' && <Badge variant="overdue">Declined</Badge>}
-                      {apt.status === 'cancelled' && <Badge variant="overdue">Cancelled</Badge>}
-                    </div>
-                    <p className="text-xs text-[#294B57] mt-1">
-                      Child: <strong className="text-[#103342]">{apt.childName}</strong> (ID: {apt.childId}) • Caregiver: {apt.caregiverName} ({apt.caregiverPhone})
-                    </p>
-                    <p className="text-[11px] text-[#294B57]/80 mt-1 flex items-center gap-2">
-                      <Clock className="w-3.5 h-3.5 text-[#007F68]" />
-                      <span>Requested for {apt.requestedDate} at {apt.timeSlot} • Type: <strong className="capitalize">{apt.visitType?.replace('_', ' ')}</strong></span>
-                    </p>
-                    {apt.notes && (
-                      <p className="text-[11px] text-[#294B57]/70 mt-1 italic">Note: "{apt.notes}"</p>
-                    )}
-                  </div>
-                </div>
+      {/* SUCCESS */}
+      {successMsg && (
+        <div
+          role="status"
+          className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2"
+        >
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {successMsg}
+        </div>
+      )}
 
-                {/* Action buttons */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {apt.status === 'requested' && (
-                    <>
-                      <button
-                        onClick={() => handleAccept(apt.id, apt.childName)}
-                        className="px-3.5 py-1.5 rounded-full bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Accept Visit</span>
-                      </button>
-                      <button
-                        onClick={() => handleOpenReschedule(apt)}
-                        className="px-3 py-1.5 rounded-full bg-white border border-[#D8E6DA] text-[#103342] font-semibold text-xs hover:bg-[#F0EBE1] transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <RotateCw className="w-3.5 h-3.5 text-[#007F68]" />
-                        <span>Reschedule</span>
-                      </button>
-                      <button
-                        onClick={() => handleDecline(apt.id, apt.childName)}
-                        className="px-3 py-1.5 rounded-full bg-red-50 text-red-600 font-semibold text-xs hover:bg-red-100 transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        <span>Decline</span>
-                      </button>
-                    </>
-                  )}
-                  {apt.status === 'confirmed' && (
-                    <>
-                      <button
-                        onClick={() => handleComplete(apt.id, apt.childName)}
-                        className="px-3.5 py-1.5 rounded-full bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Mark Completed</span>
-                      </button>
-                      <button
-                        onClick={() => handleOpenReschedule(apt)}
-                        className="px-3 py-1.5 rounded-full bg-white border border-[#D8E6DA] text-[#103342] font-semibold text-xs hover:bg-[#F0EBE1] cursor-pointer"
-                      >
-                        Change Time
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </Card>
-          ))
-        )}
+      {/* ERROR */}
+      {(errorMsg || childrenError) && (
+        <div
+          role="alert"
+          className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2"
+        >
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {errorMsg || childrenError}
+        </div>
+      )}
+
+      {/* FILTER TABS */}
+      <div className="flex flex-wrap items-center gap-2">
+
+        {[
+          ['all', 'All'],
+          ['pending', 'Pending'],
+          ['approved', 'Approved'],
+          ['history', 'History'],
+        ].map(([value, label]) => (
+
+          <button
+            key={value}
+            type="button"
+            onClick={() => setFilterStatus(value)}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold border cursor-pointer ${
+              filterStatus === value
+                ? 'bg-[#103342] text-white border-[#103342]'
+                : 'bg-[#FBF8F2] text-[#294B57] border-[#D8E6DA]'
+            }`}
+          >
+            {label}
+          </button>
+
+        ))}
+
       </div>
 
-      {/* Reschedule Modal */}
-      {isRescheduleOpen && selectedApt && (
-        <Modal
-          isOpen={isRescheduleOpen}
-          onClose={() => setIsRescheduleOpen(false)}
-          title={`Reschedule Visit: ${selectedApt.childName}`}
-          subtitle={`Current Request: ${selectedApt.requestedDate} at ${selectedApt.timeSlot}`}
-        >
-          <form onSubmit={handleSaveReschedule} className="space-y-4 text-xs text-[#294B57]">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-[#103342] mb-1">New Date</label>
-                <input
-                  type="date"
-                  min={todayStr}
-                  required
-                  value={newDate}
-                  onChange={(e) => setNewDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-[#103342] mb-1">New Time Slot</label>
-                <select
-                  value={newTime}
-                  onChange={(e) => setNewTime(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
-                >
-                  <option value="09:00 AM">09:00 AM (Morning Round)</option>
-                  <option value="10:30 AM">10:30 AM (Morning Round)</option>
-                  <option value="12:00 PM">12:00 PM (Noon Round)</option>
-                  <option value="02:30 PM">02:30 PM (Afternoon Round)</option>
-                  <option value="04:00 PM">04:00 PM (Evening Session)</option>
-                </select>
-              </div>
+      {/* APPOINTMENT LIST */}
+      <div className="space-y-4">
+
+        {!childrenLoading &&
+        !childrenError &&
+        filteredAppointments.length === 0 ? (
+
+          <Card className="p-10 bg-[#FBF8F2] border-[#D8E6DA]">
+
+            <div className="text-center">
+              <CalendarCheck className="w-10 h-10 text-[#007F68] mx-auto mb-3" />
+
+              <h3 className="font-bold text-[#103342]">
+                No Appointments Found
+              </h3>
+
+              <p className="text-xs text-[#294B57] mt-2">
+                No appointment records in this category
+                for your assigned children.
+              </p>
             </div>
 
+          </Card>
+
+        ) : (
+
+          filteredAppointments.map((appointment) => {
+
+            const isSaving =
+              savingId === appointment.id;
+
+            const approved =
+              appointment.status === 'approved' ||
+              appointment.status === 'confirmed';
+
+            const canReview =
+              appointment.status === 'requested';
+
+            const canReschedule =
+              canReview || approved;
+
+            return (
+              <Card
+                key={appointment.id}
+                className="p-5 bg-[#FBF8F2] border-[#D8E6DA]"
+              >
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+
+                  {/* APPOINTMENT DETAILS */}
+                  <div className="flex items-start gap-3">
+
+                    <div className="w-10 h-10 rounded-2xl bg-[#DDF0E3] text-[#007F68] flex items-center justify-center shrink-0">
+                      <CalendarCheck className="w-5 h-5" />
+                    </div>
+
+                    <div className="space-y-2">
+
+                      <h3 className="font-bold text-sm text-[#103342] font-serif">
+                        {appointment.purpose ||
+                          appointment.reason ||
+                          'Health Visit'}
+                      </h3>
+
+                      <p className="text-xs text-[#294B57]">
+                        Child:{' '}
+                        <strong>
+                          {getChildName(appointment.childId)}
+                        </strong>
+                      </p>
+
+                      <p className="text-[11px] text-[#294B57] flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-[#007F68]" />
+
+                        Requested Date:{' '}
+                        {appointment.requestedDate || 'Not recorded'}
+                      </p>
+
+                      <p className="text-[11px] text-[#294B57]/70">
+                        Appointment ID: {appointment.id}
+                      </p>
+
+                      <Badge
+                        variant={getBadgeVariant(
+                          appointment.status
+                        )}
+                      >
+                        {getStatusLabel(
+                          appointment.status
+                        )}
+                      </Badge>
+
+                    </div>
+                  </div>
+
+                  {/* ACTION BUTTONS */}
+                  <div className="flex flex-wrap items-center gap-2">
+
+                    {canReview && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={savingId !== null}
+                          onClick={() =>
+                            handleUpdateStatus(
+                              appointment,
+                              'approved'
+                            )
+                          }
+                          className="px-3 py-2 rounded-full bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Check className="w-4 h-4" />
+                          {isSaving
+                            ? 'Saving...'
+                            : 'Approve Visit'}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={savingId !== null}
+                          onClick={() =>
+                            handleUpdateStatus(
+                              appointment,
+                              'rejected'
+                            )
+                          }
+                          className="px-3 py-2 rounded-full bg-red-50 text-red-700 font-semibold text-xs hover:bg-red-100 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                        >
+                          <X className="w-4 h-4" />
+                          Reject
+                        </button>
+                      </>
+                    )}
+
+                    {canReschedule && (
+                      <button
+                        type="button"
+                        disabled={savingId !== null}
+                        onClick={() =>
+                          handleOpenReschedule(
+                            appointment
+                          )
+                        }
+                        className="px-3 py-2 rounded-full bg-white border border-[#D8E6DA] text-[#103342] font-semibold text-xs hover:bg-[#F0EBE1] disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                      >
+                        <RotateCw className="w-4 h-4" />
+                        Reschedule
+                      </button>
+                    )}
+
+                    {approved && (
+                      <button
+                        type="button"
+                        disabled={savingId !== null}
+                        onClick={() =>
+                          handleUpdateStatus(
+                            appointment,
+                            'completed'
+                          )
+                        }
+                        className="px-3 py-2 rounded-full bg-[#103342] text-white font-semibold text-xs hover:bg-[#0b2631] disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        Mark Completed
+                      </button>
+                    )}
+
+                  </div>
+                </div>
+              </Card>
+            );
+          })
+
+        )}
+
+      </div>
+
+      {/* RESCHEDULE MODAL */}
+      {isRescheduleOpen && selectedApt && (
+
+        <Modal
+          isOpen={isRescheduleOpen}
+          onClose={() => {
+            if (savingId === null) {
+              setIsRescheduleOpen(false);
+            }
+          }}
+          title="Reschedule Health Visit"
+          subtitle={`Appointment ID: ${selectedApt.id}`}
+        >
+
+          <form
+            onSubmit={handleSaveReschedule}
+            className="space-y-4 text-xs text-[#294B57]"
+          >
+
+            {errorMsg && (
+              <div
+                role="alert"
+                className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 flex items-center gap-2"
+              >
+                <AlertCircle className="w-4 h-4" />
+                {errorMsg}
+              </div>
+            )}
+
             <div>
-              <label className="block font-semibold text-[#103342] mb-1">Reason for Rescheduling</label>
+              <label
+                htmlFor="new-appointment-date"
+                className="block font-semibold text-[#103342] mb-1.5"
+              >
+                New Appointment Date
+              </label>
+
               <input
-                type="text"
+                id="new-appointment-date"
+                type="date"
+                min={todayStr}
                 required
-                value={rescheduleReason}
-                onChange={(e) => setRescheduleReason(e.target.value)}
-                placeholder="e.g. Wednesday sector round timing adjustment..."
-                className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
+                disabled={savingId !== null}
+                value={newDate}
+                onChange={(event) =>
+                  setNewDate(event.target.value)
+                }
+                className="w-full px-3 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
               />
             </div>
 
-            <div className="pt-2 flex justify-end gap-2">
+            <p className="p-3 rounded-xl bg-[#F0EBE1] text-xs text-[#294B57]">
+              The backend stores the new appointment date.
+              Visit time selection is not available yet.
+            </p>
+
+            <div className="flex justify-end gap-2">
+
               <button
                 type="button"
-                onClick={() => setIsRescheduleOpen(false)}
-                className="px-4 py-2 rounded-xl bg-white border border-[#D8E6DA] text-[#103342] font-semibold text-xs cursor-pointer"
+                disabled={savingId !== null}
+                onClick={() =>
+                  setIsRescheduleOpen(false)
+                }
+                className="px-4 py-2 rounded-xl bg-white border border-[#D8E6DA] font-semibold disabled:opacity-50 cursor-pointer"
               >
                 Cancel
               </button>
+
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs"
+                disabled={savingId !== null}
+                className="px-4 py-2 rounded-xl bg-[#007F68] text-white font-semibold disabled:opacity-50 cursor-pointer"
               >
-                Confirm Reschedule
+                {savingId !== null
+                  ? 'Saving...'
+                  : 'Confirm Reschedule'}
               </button>
+
             </div>
+
           </form>
         </Modal>
+
       )}
+
     </div>
   );
 }

@@ -1,453 +1,305 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, {
+  createContext, useContext, useState, useEffect, useMemo, useCallback,
+} from 'react';
 import { useAuth } from './AuthContext';
-import {
-  getChildren,
-  saveChildren,
-  updateChildRecord,
-  getChildrenForCaregiver,
-  getChildrenForWorker,
-  getLastSelectedChildId,
-  setLastSelectedChildId,
-  getStoredAppointments,
-  saveStoredAppointments,
-  getStoredNotifications,
-  saveStoredNotifications,
-  getStoredCommunications,
-  saveStoredCommunications,
-  resetAllDemoData,
-  DEFAULT_COMMUNICATIONS,
-} from '../services/storage';
+import { backendApi } from '../services/backendApi';
+import { getLastSelectedChildId, setLastSelectedChildId } from '../services/storage';
 
 const HealthDataContext = createContext(null);
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const TOKEN_KEY = 'navjyoti_access_token';
 
-const DEFAULT_APPOINTMENTS = [
-  {
-    id: "apt_001",
-    childId: "NJ-2024-0891",
-    childName: "Aarav Sharma",
-    caregiverName: "Sunita Sharma",
-    caregiverPhone: "+91 98765 43210",
-    requestedDate: "2024-11-18",
-    timeSlot: "10:30 AM",
-    visitType: "home_visit",
-    purpose: "9-Month MR-1 Immunisation & Growth Assessment",
-    status: "confirmed",
-    assignedWorker: "Rekha Devi (ANM)",
-    notes: "ANM confirmed for morning sector round.",
-  },
-  {
-    id: "apt_002",
-    childId: "NJ-2024-0412",
-    childName: "Ananya Verma",
-    caregiverName: "Pooja Verma",
-    caregiverPhone: "+91 98112 34567",
-    requestedDate: "2024-11-20",
-    timeSlot: "02:00 PM",
-    visitType: "subcentre",
-    purpose: "Overdue Pentavalent-2 Administration Catch-up",
-    status: "requested",
-    assignedWorker: "Rekha Devi (ANM)",
-    notes: "Caregiver requested sub-centre appointment on Wednesday.",
-  }
-];
+async function apiRequest(path, options = {}) {
+  const token = sessionStorage.getItem(TOKEN_KEY);
+  if (!token) throw new Error('Please sign in again.');
 
-const DEFAULT_NOTIFICATIONS = [
-  {
-    id: "notif_1",
-    title: "Upcoming UIP Dose: MR 1 & PCV Booster",
-    message: "Aarav's 9-month Measles-Rubella dose is scheduled soon. Visit Rampur Sub-Centre on Wednesday.",
-    type: "due_soon",
-    timestamp: "Yesterday, 4:00 PM",
-    read: false,
-    childId: "NJ-2024-0891",
-  },
-  {
-    id: "notif_2",
-    title: "Home Visit Confirmed",
-    message: "ANM Rekha Devi confirmed the home visit for 18th Nov at 10:30 AM.",
-    type: "appointment",
-    timestamp: "2 days ago",
-    read: true,
-    childId: "NJ-2024-0891",
-  },
-  {
-    id: "notif_3",
-    title: "Developmental Checkpoint Observed",
-    message: "Motor milestone 'Sits without support' logged by frontline worker.",
-    type: "milestone",
-    timestamp: "5 days ago",
-    read: true,
-    childId: "NJ-2024-0891",
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...options.headers,
+    },
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(
+      typeof result?.detail === 'string'
+        ? result.detail
+        : `Backend request failed (${response.status})`
+    );
   }
-];
+  return result;
+}
+
+function formatChild(record, currentUser, vaccinations = [], growth = [], milestones = []) {
+  const dob = record.date_of_birth;
+  return {
+    id: record.id,
+    name: record.name,
+    dob,
+    date_of_birth: dob,
+    parent_id: record.parent_id,
+    caregiverId: record.parent_id,
+    caregiverName: currentUser.role === 'parent' ? currentUser.name : '',
+    caregiverPhone: '',
+    assigned_worker_id: record.assigned_worker_id,
+    assignedWorker: null,
+    village: null,
+    subCentre: null,
+    phc: null,
+    priorityLevel: null,
+    // QR access must be implemented securely on the backend.
+    qrToken: null,
+    doses: vaccinations.map((v) => ({
+      id: v.id,
+      vaccineId: String(v.id),
+      vaccineName: v.vaccine_name,
+      dueDate: v.due_date,
+      dateAdministered: v.administered_date,
+      status: v.completed ? 'administered' : 'scheduled',
+    })),
+    growthRecords: growth.map((g) => ({
+      id: g.id,
+      date: g.measurement_date,
+      weightKg: g.weight_kg,
+      heightCm: g.height_cm,
+      recordedBy: g.recorded_by,
+    })),
+    milestones: milestones.map((m) => ({
+      id: m.id,
+      milestoneId: String(m.id),
+      domain: m.category,
+      title: m.description,
+      status: m.status,
+      observedDate: m.observation_date,
+      notes: m.description,
+    })),
+    visitHistory: [],
+    followUpNotes: '',
+  };
+}
+
+function formatAppointment(a) {
+  return {
+    id: a.id,
+    childId: a.child_id,
+    requestedDate: a.appointment_date,
+    purpose: a.reason,
+    reason: a.reason,
+    status: a.status,
+    timeSlot: null,
+    visitType: null,
+  };
+}
+
+const notConnected = (feature) => {
+  throw new Error(`${feature} is not connected to the backend yet.`);
+};
 
 export function HealthDataProvider({ children }) {
-  const { user } = useAuth();
-
-  const [allChildren, setAllChildren] = useState(() => getChildren());
-  const [appointments, setAppointments] = useState(() => getStoredAppointments(DEFAULT_APPOINTMENTS));
-  const [notifications, setNotifications] = useState(() => getStoredNotifications(DEFAULT_NOTIFICATIONS));
-  const [communications, setCommunications] = useState(() => getStoredCommunications(DEFAULT_COMMUNICATIONS));
-
-  // Determine accessible children based on authenticated role & user ID (Data Isolation)
-  const accessibleChildren = useMemo(() => {
-    if (!user) return [];
-    if (user.role === 'parent') {
-      return getChildrenForCaregiver(user.id, user.phone);
-    }
-    if (user.role === 'worker') {
-      return getChildrenForWorker(user.jurisdiction);
-    }
-    // Supervisor sees all children in block/district
-    return allChildren;
-  }, [user, allChildren]);
-
-  // Active child state, isolated per caregiver with persistent memory
+  const { user, isLoading: authLoading } = useAuth();
+  const [allChildren, setAllChildren] = useState([]);
+  const [childrenLoading, setChildrenLoading] = useState(true);
+  const [childrenError, setChildrenError] = useState(null);
+  const [appointments, setAppointments] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [communications] = useState([]);
   const [activeChildId, setActiveChildIdState] = useState(null);
+  const [refreshIndex, setRefreshIndex] = useState(0);
+
+  const refreshChildren = useCallback(() => setRefreshIndex((n) => n + 1), []);
 
   useEffect(() => {
-    if (!user) {
+    let cancelled = false;
+
+    async function loadChildren() {
+      setAllChildren([]);
+      setAppointments([]);
+      setChildrenError(null);
+      setChildrenLoading(true);
+
+      if (authLoading) return;
+      if (!user) {
+        setChildrenLoading(false);
+        return;
+      }
+
+      const token = sessionStorage.getItem(TOKEN_KEY);
+      if (!token) {
+        setChildrenError('Please sign in again.');
+        setChildrenLoading(false);
+        return;
+      }
+
+      try {
+        let records = [];
+        if (user.role === 'parent') {
+          records = await backendApi.getChildren(token);
+        } else if (user.role === 'worker') {
+          records = await apiRequest('/worker/children');
+        } // No supervisor child-list API has been built yet.
+
+        const detailed = await Promise.all(records.map(async (record) => {
+          // Parent and assigned worker vaccination access is checked by FastAPI.
+          const [vaccinations, growth, milestones, childAppointments] = await Promise.all([
+            apiRequest(`/children/${record.id}/vaccinations`),
+            apiRequest(`/children/${record.id}/growth`),
+            apiRequest(`/children/${record.id}/milestones`),
+            apiRequest(`/children/${record.id}/appointments`),
+          ]);
+          return {
+            child: formatChild(record, user, vaccinations, growth, milestones),
+            appointments: childAppointments.map(formatAppointment),
+          };
+        }));
+
+        if (!cancelled) {
+          setAllChildren(detailed.map((item) => item.child));
+          setAppointments(detailed.flatMap((item) => item.appointments));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to load NavJyoti records:', error);
+          setChildrenError(error.message);
+        }
+      } finally {
+        if (!cancelled) setChildrenLoading(false);
+      }
+    }
+
+    loadChildren();
+    return () => { cancelled = true; };
+  }, [user?.id, user?.role, authLoading, refreshIndex]);
+
+  // The server filters records for the authenticated parent or worker.
+  const accessibleChildren = useMemo(() => {
+    if (user?.role === 'parent' || user?.role === 'worker') return allChildren;
+    return [];
+  }, [user?.role, allChildren]);
+
+  useEffect(() => {
+    if (!user || accessibleChildren.length === 0) {
       setActiveChildIdState(null);
       return;
     }
-
-    if (user.role === 'parent') {
-      const savedChildId = getLastSelectedChildId(user.id);
-      const isStillAccessible = accessibleChildren.some((c) => c.id === savedChildId);
-
-      if (savedChildId && isStillAccessible) {
-        setActiveChildIdState(savedChildId);
-      } else if (accessibleChildren.length > 0) {
-        setActiveChildIdState(accessibleChildren[0].id);
-        setLastSelectedChildId(user.id, accessibleChildren[0].id);
-      } else {
-        setActiveChildIdState(null);
-      }
-    } else {
-      // Worker or Supervisor role
-      if (accessibleChildren.length > 0 && !accessibleChildren.some((c) => c.id === activeChildId)) {
-        setActiveChildIdState(accessibleChildren[0].id);
-      }
-    }
-  }, [user, accessibleChildren]);
+    setActiveChildIdState((oldId) => {
+      if (accessibleChildren.some((c) => String(c.id) === String(oldId))) return oldId;
+      const saved = user.role === 'parent' ? getLastSelectedChildId(user.id) : null;
+      const matched = accessibleChildren.find((c) => String(c.id) === String(saved));
+      return (matched || accessibleChildren[0]).id;
+    });
+  }, [user?.id, user?.role, accessibleChildren]);
 
   const setActiveChildId = (childId) => {
-    setActiveChildIdState(childId);
-    if (user && user.role === 'parent') {
-      setLastSelectedChildId(user.id, childId);
-    }
+    const matched = accessibleChildren.find((c) => String(c.id) === String(childId));
+    if (!matched) return;
+    setActiveChildIdState(matched.id);
+    if (user?.role === 'parent') setLastSelectedChildId(user.id, String(matched.id));
   };
 
-  const activeChild = accessibleChildren.find((c) => c.id === activeChildId) || null;
+  const activeChild = accessibleChildren.find(
+    (c) => String(c.id) === String(activeChildId)
+  ) || null;
 
-  // Sync state changes with persistence
-  const updateAllChildren = (newChildren) => {
-    setAllChildren(newChildren);
-    saveChildren(newChildren);
-  };
-
-  // Helper to recalculate administrative priority deterministically
-  const computePriority = (doses) => {
-    const hasOverdue = doses.some((d) => d.status === 'overdue');
-    if (hasOverdue) return 'red'; // Administrative urgent follow-up
-    const hasDueSoon = doses.some((d) => d.status === 'due_soon');
-    if (hasDueSoon) return 'amber';
-    return 'green';
-  };
-
-  // Officially record an administered dose (with duplicate protection)
-  const administerDose = (childId, vaccineId, details) => {
-    const child = allChildren.find((c) => c.id === childId);
-    if (!child) return;
-
-    const existingDose = child.doses?.find((d) => d.vaccineId === vaccineId);
-    if (existingDose && existingDose.status === 'administered') {
-      console.warn(`[NavJyoti] Dose ${vaccineId} is already marked as administered.`);
-      return;
-    }
-
-    const updated = allChildren.map((c) => {
-      if (c.id !== childId) return c;
-      const updatedDoses = c.doses.map((d) => {
-        if (d.vaccineId === vaccineId) {
-          return {
-            ...d,
-            status: "administered",
-            dateAdministered: details.dateAdministered || new Date().toISOString().split('T')[0],
-            batch: details.batch || `BATCH-${Date.now().toString().slice(-4)}`,
-            facility: details.facility || "Rampur Sub-Centre",
-            workerName: details.workerName || "Rekha Devi (ANM)",
-            site: details.site || "Upper arm / Mid-thigh",
-            notes: details.notes || "",
-          };
-        }
-        return d;
-      });
-
-      const newVisit = {
-        id: `vh_${Date.now()}`,
-        date: details.dateAdministered || new Date().toISOString().split('T')[0],
-        visitType: "Vaccination Administration",
-        provider: details.workerName || "Rekha Devi (ANM)",
-        notes: `Administered ${vaccineId.toUpperCase()} (Batch: ${details.batch || 'Verified'}).`,
-      };
-
-      return {
-        ...c,
-        doses: updatedDoses,
-        priorityLevel: computePriority(updatedDoses),
-        visitHistory: [newVisit, ...(c.visitHistory || [])],
-        updatedAt: new Date().toISOString(),
-      };
+  // This is a real backend write; callers should await registerChild(...).
+  const registerChild = async (data) => {
+    if (user?.role !== 'parent') throw new Error('Only parents can register children.');
+    const created = await apiRequest('/children', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: data.name,
+        date_of_birth: data.dob || data.date_of_birth,
+      }),
     });
-
-    updateAllChildren(updated);
-
-    // Add notification
-    const newNotif = {
-      id: `notif_${Date.now()}`,
-      title: "Dose Administered & Verified",
-      message: `${vaccineId.toUpperCase()} officially recorded by ANM at ${details.facility || "Sub-Centre"}.`,
-      type: "administered",
-      timestamp: "Just now",
-      read: false,
-      childId: childId,
-    };
-    const updatedNotifs = [newNotif, ...notifications];
-    setNotifications(updatedNotifs);
-    saveStoredNotifications(updatedNotifs);
+    refreshChildren();
+    return formatChild(created, user);
   };
 
-  // Register a new child linked explicitly to the active caregiver
-  const registerChild = (newChildData) => {
-    const stableId = `NJ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const fullChild = {
-      id: stableId,
-      caregiverId: user ? user.id : "usr_parent_01",
-      caregiverName: user ? user.name : (newChildData.caregiverName || "Caregiver"),
-      caregiverPhone: user ? user.phone : (newChildData.caregiverPhone || "+91 98765 43210"),
-      village: user?.village || newChildData.village || "Rampur",
-      subCentre: user?.jurisdiction?.subCentre || `${newChildData.village || "Rampur"} Sub-Centre`,
-      phc: "Bilaspur Primary Health Centre",
-      assignedWorker: newChildData.assignedWorker || "Rekha Devi (ANM)",
-      migrationStatus: newChildData.migrationStatus || "resident",
-      bloodGroup: newChildData.bloodGroup || "B+",
-      birthWeightKg: Number(newChildData.birthWeightKg) || 3.1,
-      priorityLevel: "amber",
-      qrToken: `tok_${stableId.toLowerCase().replace('-', '_')}_sec`,
-      createdAt: new Date().toISOString(),
-      doses: newChildData.doses || [
-        { id: `d_${Date.now()}_1`, vaccineId: "bcg", vaccineName: "BCG", status: "administered", dateAdministered: newChildData.dob, facility: "Sub-Centre", workerName: "Rekha Devi (ANM)", site: "Left upper arm" },
-        { id: `d_${Date.now()}_2`, vaccineId: "opv_0", vaccineName: "OPV 0", status: "administered", dateAdministered: newChildData.dob, facility: "Sub-Centre", workerName: "Rekha Devi (ANM)", site: "Oral" },
-        { id: `d_${Date.now()}_3`, vaccineId: "penta_1", vaccineName: "Pentavalent 1", status: "due_soon", dueDate: "2024-12-15", facility: "Sub-Centre" }
-      ],
-      milestones: newChildData.milestones || [],
-      growthRecords: [
-        { id: `gr_${Date.now()}`, date: newChildData.dob, ageMonths: 0, weightKg: Number(newChildData.birthWeightKg) || 3.1, heightCm: 49.0, headCircumferenceCm: 34.0, recordedBy: "Sub-Centre" }
-      ],
-      visitHistory: [
-        { id: `vh_${Date.now()}`, date: newChildData.dob, visitType: "Birth Registration", provider: "Rekha Devi (ANM)", notes: "Child profile registered into NavJyoti." }
-      ],
-      followUpNotes: "",
-      ...newChildData,
-    };
+  // The existing UI actions below must not silently alter local copies of
+  // medical data. Wire them to verified API endpoints before enabling them.
+  const updateChild = async () => notConnected('Child profile editing');
+  const administerDose = async () => notConnected('Vaccination recording from this screen');
+  const recordMilestoneObservation = async () => notConnected('Milestone recording from this screen');
+  const updateFollowUp = async () => notConnected('Follow-up changes from this screen');
 
-    const updatedChildren = [fullChild, ...allChildren];
-    updateAllChildren(updatedChildren);
-
-    if (user && user.role === 'parent') {
-      setActiveChildId(stableId);
-    }
-    return fullChild;
-  };
-
-  // Update existing child profile
-  const updateChild = (childId, patchData) => {
-    const updated = allChildren.map((c) => (c.id === childId ? { ...c, ...patchData, updatedAt: new Date().toISOString() } : c));
-    updateAllChildren(updated);
-    return updated.find((c) => c.id === childId);
-  };
-
-  // Record or toggle parent/worker milestone observation
-  const recordMilestoneObservation = (childId, { milestoneId, domain, title, status = 'recorded', notes = '' }) => {
-    const updated = allChildren.map((c) => {
-      if (c.id !== childId) return c;
-      const currentMilestones = c.milestones || [];
-      const existingIdx = currentMilestones.findIndex((m) => m.milestoneId === milestoneId);
-
-      const obs = {
-        id: existingIdx >= 0 ? currentMilestones[existingIdx].id : `m_${Date.now()}`,
-        milestoneId,
-        domain,
-        title,
-        status,
-        observedDate: new Date().toISOString().split('T')[0],
-        notes: notes.trim(),
-      };
-
-      let nextMilestones;
-      if (existingIdx >= 0) {
-        nextMilestones = [...currentMilestones];
-        nextMilestones[existingIdx] = obs;
-      } else {
-        nextMilestones = [obs, ...currentMilestones];
-      }
-
-      return {
-        ...c,
-        milestones: nextMilestones,
-        updatedAt: new Date().toISOString(),
-      };
+  const requestAppointment = async (data) => {
+    const created = await apiRequest(`/children/${data.childId}/appointments`, {
+      method: 'POST',
+      body: JSON.stringify({
+        appointment_date: data.requestedDate || data.appointment_date,
+        reason: data.purpose || data.reason,
+      }),
     });
-
-    updateAllChildren(updated);
+    setAppointments((prev) => [...prev, formatAppointment(created)]);
+    return formatAppointment(created);
   };
 
-  // Request new appointment with duplicate validation
-  const requestAppointment = (aptData) => {
-    const isDuplicate = appointments.some(
-      (a) => a.childId === aptData.childId && a.requestedDate === aptData.requestedDate && a.status !== 'cancelled'
-    );
-    if (isDuplicate) {
-      throw new Error(`An appointment request already exists for this child on ${aptData.requestedDate}.`);
-    }
-
-    const newApt = {
-      id: `apt_${Date.now()}`,
-      status: "requested",
-      createdAt: new Date().toISOString(),
-      ...aptData,
-    };
-    const updated = [newApt, ...appointments];
-    setAppointments(updated);
-    saveStoredAppointments(updated);
-    return newApt;
-  };
-
-  // Accept/decline/complete appointment
-  const updateAppointmentStatus = (aptId, newStatus, workerNotes = "") => {
-    const updated = appointments.map((a) =>
-      a.id === aptId ? { ...a, status: newStatus, notes: workerNotes || a.notes, updatedAt: new Date().toISOString() } : a
-    );
-    setAppointments(updated);
-    saveStoredAppointments(updated);
-  };
-
-  // Reschedule appointment
-  const rescheduleAppointment = (aptId, newDate, newTimeSlot, reason = "") => {
-    const updated = appointments.map((a) =>
-      a.id === aptId
-        ? {
-            ...a,
-            requestedDate: newDate,
-            timeSlot: newTimeSlot,
-            status: "confirmed",
-            notes: reason ? `Rescheduled: ${reason}` : a.notes,
-            updatedAt: new Date().toISOString(),
-          }
-        : a
-    );
-    setAppointments(updated);
-    saveStoredAppointments(updated);
-  };
-
-  // Cancel appointment
-  const cancelAppointment = (aptId, reason = "") => {
-    updateAppointmentStatus(aptId, 'cancelled', reason ? `Cancelled: ${reason}` : 'Cancelled by user');
-  };
-
-  // Notifications actions
-  const markNotificationAsRead = (notifId) => {
-    const updated = notifications.map((n) => (n.id === notifId ? { ...n, read: true } : n));
-    setNotifications(updated);
-    saveStoredNotifications(updated);
-  };
-
-  const markAllNotificationsAsRead = () => {
-    const updated = notifications.map((n) => ({ ...n, read: true }));
-    setNotifications(updated);
-    saveStoredNotifications(updated);
-  };
-
-  const dismissNotification = (notifId) => {
-    const updated = notifications.filter((n) => n.id !== notifId);
-    setNotifications(updated);
-    saveStoredNotifications(updated);
-  };
-
-  // Communications actions
-  const sendSimulatedMessage = ({ recipientName, recipientPhone, childId, childName, message, type = 'reminder' }) => {
-    const newComm = {
-      id: `comm_${Date.now()}`,
-      recipientName,
-      recipientPhone,
-      childId,
-      childName,
-      type,
-      message,
-      channel: "Simulated SMS",
-      sentAt: new Date().toISOString(),
-      status: "Delivered (Simulated)",
-    };
-
-    const updated = [newComm, ...communications];
-    setCommunications(updated);
-    saveStoredCommunications(updated);
-    return newComm;
-  };
-
-  // Update follow-up status for priority queue
-  const updateFollowUp = (childId, { priorityLevel, notes }) => {
-    const updated = allChildren.map((c) => {
-      if (c.id !== childId) return c;
-      return {
-        ...c,
-        priorityLevel: priorityLevel || c.priorityLevel,
-        followUpNotes: notes !== undefined ? notes : c.followUpNotes,
-        updatedAt: new Date().toISOString(),
-      };
+  const updateAppointmentStatus = async (id, newStatus) => {
+    const updated = await apiRequest(`/worker/appointments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: newStatus }),
     });
-    updateAllChildren(updated);
+    setAppointments((prev) => prev.map((a) =>
+      String(a.id) === String(id) ? formatAppointment(updated) : a
+    ));
+    return formatAppointment(updated);
   };
 
-  // Factory reset demo data (for development/testing only)
-  const resetDemoData = () => {
-    resetAllDemoData();
-    const freshChildren = getChildren();
-    setAllChildren(freshChildren);
-    setAppointments(DEFAULT_APPOINTMENTS);
-    setNotifications(DEFAULT_NOTIFICATIONS);
-    setCommunications(DEFAULT_COMMUNICATIONS);
-    setActiveChildIdState(freshChildren[0]?.id || null);
+  const rescheduleAppointment = async (id, newDate) => {
+    const updated = await apiRequest(`/worker/appointments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'rescheduled', appointment_date: newDate }),
+    });
+    setAppointments((prev) => prev.map((a) =>
+      String(a.id) === String(id) ? formatAppointment(updated) : a
+    ));
+    return formatAppointment(updated);
   };
+
+  const cancelAppointment = async () => notConnected('Appointment cancellation from this screen');
+
+  // Notifications and SMS are not backed by a real service yet.
+  const markNotificationAsRead = (id) => setNotifications((prev) =>
+    prev.map((n) => n.id === id ? { ...n, read: true } : n)
+  );
+  const markAllNotificationsAsRead = () => setNotifications((prev) =>
+    prev.map((n) => ({ ...n, read: true }))
+  );
+  const dismissNotification = (id) => setNotifications((prev) =>
+    prev.filter((n) => n.id !== id)
+  );
+  const sendSimulatedMessage = async () => notConnected('Messaging');
+  const resetDemoData = () => notConnected('Demo reset');
 
   return (
-    <HealthDataContext.Provider
-      value={{
-        childrenList: accessibleChildren,
-        allChildren,
-        activeChild,
-        activeChildId,
-        setActiveChildId,
-        appointments,
-        notifications,
-        communications,
-        administerDose,
-        registerChild,
-        updateChild,
-        recordMilestoneObservation,
-        requestAppointment,
-        updateAppointmentStatus,
-        rescheduleAppointment,
-        cancelAppointment,
-        markNotificationAsRead,
-        markAllNotificationsAsRead,
-        dismissNotification,
-        sendSimulatedMessage,
-        updateFollowUp,
-        resetDemoData,
-      }}
-    >
+    <HealthDataContext.Provider value={{
+      childrenList: accessibleChildren,
+      allChildren,
+      childrenLoading,
+      childrenError,
+      activeChild,
+      activeChildId,
+      setActiveChildId,
+      refreshChildren,
+      appointments,
+      notifications,
+      communications,
+      administerDose,
+      registerChild,
+      updateChild,
+      recordMilestoneObservation,
+      requestAppointment,
+      updateAppointmentStatus,
+      rescheduleAppointment,
+      cancelAppointment,
+      markNotificationAsRead,
+      markAllNotificationsAsRead,
+      dismissNotification,
+      sendSimulatedMessage,
+      updateFollowUp,
+      resetDemoData,
+    }}>
       {children}
     </HealthDataContext.Provider>
   );
@@ -455,8 +307,6 @@ export function HealthDataProvider({ children }) {
 
 export function useHealthData() {
   const context = useContext(HealthDataContext);
-  if (!context) {
-    throw new Error('useHealthData must be used within a HealthDataProvider');
-  }
+  if (!context) throw new Error('useHealthData must be used within a HealthDataProvider');
   return context;
 }
