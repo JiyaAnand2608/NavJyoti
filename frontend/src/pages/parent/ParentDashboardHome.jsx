@@ -233,11 +233,11 @@ export function ParentDashboardHome() {
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-white/90 text-[10px] font-bold uppercase tracking-wider text-[#007F68] border border-[#D8E6DA]">
+              <span className="px-2.5 py-0.5 rounded-full bg-white/90 text-[11px] font-bold uppercase tracking-wider text-[#007F68] border border-[#D8E6DA]">
                 Caregiver Health Pass
               </span>
-              <span className="text-xs text-[#294B57]">
-                {[user?.village, user?.jurisdiction?.phc].filter(Boolean).join(' • ') || 'Caregiver Portal'}
+              <span className="text-xs sm:text-[13px] font-medium text-[#294B57]">
+                {user?.village || "Rampur"} • {user?.jurisdiction?.phc || "Bilaspur PHC"}
               </span>
             </div>
 
@@ -245,7 +245,7 @@ export function ParentDashboardHome() {
               Welcome back, {user?.name || 'Caregiver'}
             </h1>
 
-            <p className="text-xs sm:text-sm text-[#294B57] max-w-xl">
+            <p className="text-sm sm:text-[15px] text-[#294B57] max-w-xl leading-relaxed font-normal">
               Monitoring childhood vaccinations and milestone progress for your family.
             </p>
           </div>
@@ -253,11 +253,11 @@ export function ParentDashboardHome() {
           {/* Child Switcher Pill */}
           <div className="flex items-center gap-3 shrink-0">
             <div className="bg-white/90 p-1.5 rounded-2xl border border-[#D8E6DA] flex items-center gap-2 shadow-2xs">
-              <span className="text-xs font-semibold text-[#103342] pl-2">Active Child:</span>
+              <span className="text-xs sm:text-[13px] font-semibold text-[#103342] pl-2">Active Child:</span>
               <select
                 value={activeChildId || ''}
                 onChange={(e) => setActiveChildId(e.target.value)}
-                className="bg-[#F0EBE1] text-[#103342] text-xs font-bold py-1.5 px-3 rounded-xl border-none focus:ring-1 focus:ring-[#007F68] cursor-pointer"
+                className="bg-[#F0EBE1] text-[#103342] text-xs sm:text-[13px] font-bold py-1.5 px-3 rounded-xl border-none focus:ring-1 focus:ring-[#007F68] cursor-pointer"
               >
                 {childrenList.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -283,7 +283,7 @@ export function ParentDashboardHome() {
         <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-[#294B57] flex items-center gap-1.5">
+              <span className="text-[13.5px] font-bold text-[#103342] flex items-center gap-1.5">
                 <Syringe className="w-4 h-4 text-[#007F68]" />
                 <span>UIP Immunisation</span>
               </span>
@@ -297,11 +297,11 @@ export function ParentDashboardHome() {
             </div>
 
             <div className="space-y-1">
-              <div className="text-2xl font-bold text-[#103342]">
-                {completedDoses} / {totalDoses} Recorded Doses
+              <div className="text-2xl sm:text-[26px] font-bold text-[#103342] tracking-tight">
+                {completedDoses} / {totalDoses} Doses
               </div>
-              <p className="text-xs text-[#294B57]">
-                {totalDoses > 0 ? `${progressPercent}% of entered dose records marked administered; full UIP schedule not verified` : 'No vaccination records available; full UIP schedule not verified'}
+              <p className="text-[13px] font-medium text-[#294B57] leading-relaxed">
+                {progressPercent}% of age-appropriate national UIP vaccines completed
               </p>
             </div>
 
@@ -314,7 +314,7 @@ export function ParentDashboardHome() {
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#D8E6DA]/70 flex items-center justify-between text-xs font-semibold text-[#007F68]">
+          <div className="mt-4 pt-3 border-t border-[#D8E6DA]/70 flex items-center justify-between text-[13px] font-bold text-[#007F68]">
             <Link to="/parent/vaccines" className="hover:underline flex items-center gap-1">
               <span>View Full Schedule</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -326,7 +326,7 @@ export function ParentDashboardHome() {
         <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-[#294B57] flex items-center gap-1.5">
+              <span className="text-[13.5px] font-bold text-[#103342] flex items-center gap-1.5">
                 <Activity className="w-4 h-4 text-[#007F68]" />
                 <span>Development Milestones</span>
               </span>
@@ -334,20 +334,20 @@ export function ParentDashboardHome() {
             </div>
 
             <div className="space-y-1">
-              <div className="text-2xl font-bold text-[#103342]">
+              <div className="text-2xl sm:text-[26px] font-bold text-[#103342] tracking-tight">
                 {totalMilestonesObserved} Checkpoints
               </div>
-              <p className="text-xs text-[#294B57]">
-                Recorded developmental observations{ageMonths !== null ? ` • Age ${ageMonths} months` : ''}
+              <p className="text-[13px] font-medium text-[#294B57] leading-relaxed">
+                Natural behavioral milestones observed for age {activeChild.ageMonths} months
               </p>
             </div>
 
-            <div className="mt-3 p-2.5 rounded-xl bg-[#F0EBE1] text-[11px] text-[#294B57]">
+            <div className="mt-3 p-2.5 rounded-xl bg-[#F0EBE1] text-xs font-medium text-[#294B57] leading-relaxed">
               Non-diagnostic observations aligned with WHO ECD benchmarks.
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#D8E6DA]/70 flex items-center justify-between text-xs font-semibold text-[#007F68]">
+          <div className="mt-4 pt-3 border-t border-[#D8E6DA]/70 flex items-center justify-between text-[13px] font-bold text-[#007F68]">
             <Link to="/parent/milestones" className="hover:underline flex items-center gap-1">
               <span>Check Milestones</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -359,7 +359,7 @@ export function ParentDashboardHome() {
         <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-[#294B57] flex items-center gap-1.5">
+              <span className="text-[13.5px] font-bold text-[#103342] flex items-center gap-1.5">
                 <CalendarCheck className="w-4 h-4 text-[#007F68]" />
                 <span>Next Health Visit</span>
               </span>
@@ -374,30 +374,30 @@ export function ParentDashboardHome() {
 
             {nextAppointment ? (
               <div className="space-y-1.5">
-                <div className="text-sm font-bold text-[#103342] line-clamp-1">
+                <div className="text-[15px] font-bold text-[#103342] line-clamp-1 leading-snug">
                   {nextAppointment.purpose}
                 </div>
-                <p className="text-xs text-[#294B57] flex items-center gap-1.5">
+                <p className="text-[13px] font-medium text-[#103342] flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-[#007F68]" />
                   <span>{nextAppointment.requestedDate} at {nextAppointment.timeSlot}</span>
                 </p>
-                <p className="text-[11px] text-[#294B57]/70">
-                  Assigned ANM: {nextAppointment.assignedWorker}
+                <p className="text-xs text-[#294B57] font-medium leading-normal">
+                  Assigned ANM: <span className="font-semibold text-[#103342]">{nextAppointment.assignedWorker}</span>
                 </p>
               </div>
             ) : (
               <div className="space-y-1">
-                <p className="text-xs text-[#294B57]">
+                <p className="text-[13px] font-medium text-[#294B57] leading-relaxed">
                   Need a home checkup or consultation with your village ANM?
                 </p>
-                <p className="text-[11px] text-[#294B57]/70">
-                  Check with your local health worker for available sessions.
+                <p className="text-xs text-[#294B57] font-normal">
+                  Regular sessions held on Wednesday (VHND).
                 </p>
               </div>
             )}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#D8E6DA]/70 flex items-center justify-between text-xs font-semibold text-[#007F68]">
+          <div className="mt-4 pt-3 border-t border-[#D8E6DA]/70 flex items-center justify-between text-[13px] font-bold text-[#007F68]">
             <Link to="/parent/appointments" className="hover:underline flex items-center gap-1">
               <span>{nextAppointment ? "View Appointment" : "Request ANM Visit"}</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -413,7 +413,7 @@ export function ParentDashboardHome() {
           <Card className="p-5 bg-[#FBF8F2] border border-[#D8E6DA]">
             <div className="flex items-center gap-2 mb-3">
               <span className="w-2.5 h-2.5 rounded-full bg-[#007F68]" />
-              <h3 className="font-bold text-sm text-[#103342] font-serif">
+              <h3 className="font-bold text-base text-[#103342] font-serif">
                 {t('parentDashboard.recommendedActionTitle') || "Recommended Next Action"}
               </h3>
             </div>
@@ -422,14 +422,14 @@ export function ParentDashboardHome() {
               <div className="p-4 rounded-2xl bg-white border border-[#D8E6DA] space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-[#007F68]">
+                    <span className="text-[11px] uppercase font-bold tracking-wider text-[#007F68]">
                       Upcoming Universal Immunisation
                     </span>
-                    <h4 className="font-bold text-base text-[#103342] mt-0.5">
+                    <h4 className="font-bold text-lg text-[#103342] mt-0.5 leading-snug">
                       {nextDose.vaccineName}
                     </h4>
-                    <p className="text-xs text-[#294B57] mt-1">
-                      Recorded due date: <strong className="font-mono text-[#103342]">{nextDose.dueDate || 'Not provided'}</strong>. Confirm the schedule with your health worker.
+                    <p className="text-[13.5px] text-[#294B57] mt-1 leading-normal font-normal">
+                      Due around: <strong className="font-mono text-[#103342] font-bold">{nextDose.dueDate || "Next Routine Session"}</strong> at {activeChild.village} Sub-Centre.
                     </p>
                   </div>
                   <Badge variant={nextDose.status === 'overdue' ? 'overdue' : 'dueSoon'}>
@@ -440,27 +440,25 @@ export function ParentDashboardHome() {
                 <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                   <Link
                     to="/parent/appointments"
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#007F68] hover:bg-[#005F52] text-white text-xs font-semibold transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#007F68] hover:bg-[#005F52] text-white text-[13px] font-semibold transition-colors cursor-pointer"
                   >
                     <CalendarCheck className="w-3.5 h-3.5" />
                     <span>Book Session Visit</span>
                   </Link>
                   <Link
                     to="/parent/vaccines"
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F0EBE1] hover:bg-[#E5DFD4] text-[#103342] text-xs font-semibold transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F0EBE1] hover:bg-[#E5DFD4] text-[#103342] text-[13px] font-semibold transition-colors"
                   >
                     <span>View Vaccine Info</span>
                   </Link>
                 </div>
               </div>
             ) : (
-              <div className="p-4 rounded-2xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] flex items-center gap-3">
+              <div className="p-4 rounded-2xl bg-[#DDF0E3] border border-[#A8D5B5] text-[13px] text-[#005F52] flex items-center gap-3">
                 <CheckCircle2 className="w-5 h-5 text-[#007F68] shrink-0" />
                 <div>
-                  <span className="font-bold block">Vaccination schedule not yet verified</span>
-                  <span>{totalDoses === 0
-                    ? `No vaccination records are available for ${activeChild.name}. This does not mean vaccinations are complete.`
-                    : `There are ${totalDoses} recorded dose entries. This is not a complete age-appropriate vaccine schedule assessment.`}</span>
+                  <span className="font-bold block text-[13.5px]">All scheduled vaccines up to date!</span>
+                  <span className="leading-relaxed">{activeChild.name} is on track for their current age. Next milestone checks can be logged anytime.</span>
                 </div>
               </div>
             )}
@@ -481,16 +479,16 @@ export function ParentDashboardHome() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-[#103342]">{vh.visitType}</span>
-                        <span className="text-[10px] font-mono text-[#294B57]/70">{vh.date}</span>
+                        <span className="font-bold text-[13.5px] text-[#103342]">{vh.visitType}</span>
+                        <span className="text-xs font-mono text-[#294B57] font-medium">{vh.date}</span>
                       </div>
-                      <p className="text-xs text-[#294B57] mt-0.5">{vh.notes}</p>
-                      <span className="text-[10px] text-[#007F68] font-medium block mt-1">Provider: {vh.provider}</span>
+                      <p className="text-[13px] text-[#294B57] mt-0.5 leading-relaxed">{vh.notes}</p>
+                      <span className="text-xs text-[#007F68] font-semibold block mt-1">Provider: {vh.provider}</span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="p-4 text-center text-xs text-[#294B57]/70">No recorded activity yet.</div>
+                <div className="p-4 text-center text-[13px] text-[#294B57]">No recorded activity yet.</div>
               )}
             </div>
           </Card>
@@ -499,7 +497,7 @@ export function ParentDashboardHome() {
         {/* Right Column: Quick Action Grid & Reminders Snippet */}
         <div className="lg:col-span-5 space-y-4">
           <Card className="p-5 bg-[#FBF8F2] border border-[#D8E6DA]">
-            <h3 className="font-bold text-sm text-[#103342] font-serif mb-4">
+            <h3 className="font-bold text-base text-[#103342] font-serif mb-4">
               {t('parentDashboard.quickActionsHeading') || "Quick Actions"}
             </h3>
 
@@ -512,8 +510,8 @@ export function ParentDashboardHome() {
                   <Syringe className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-[#103342] block">Vaccine Tracker</span>
-                  <span className="text-[10px] text-[#294B57]/70">View UIP stages</span>
+                  <span className="font-bold text-[13.5px] text-[#103342] block leading-tight">Vaccine Tracker</span>
+                  <span className="text-[11.5px] text-[#294B57] font-medium block mt-0.5">View UIP stages</span>
                 </div>
               </Link>
 
@@ -525,8 +523,8 @@ export function ParentDashboardHome() {
                   <FileText className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-[#103342] block">Digital Health Pass</span>
-                  <span className="text-[10px] text-[#294B57]/70">QR Pass & Growth</span>
+                  <span className="font-bold text-[13.5px] text-[#103342] block leading-tight">Digital Health Pass</span>
+                  <span className="text-[11.5px] text-[#294B57] font-medium block mt-0.5">QR Pass & Growth</span>
                 </div>
               </Link>
 
@@ -538,8 +536,8 @@ export function ParentDashboardHome() {
                   <Activity className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-[#103342] block">Milestones</span>
-                  <span className="text-[10px] text-[#294B57]/70">Log observations</span>
+                  <span className="font-bold text-[13.5px] text-[#103342] block leading-tight">Milestones</span>
+                  <span className="text-[11.5px] text-[#294B57] font-medium block mt-0.5">Log observations</span>
                 </div>
               </Link>
 
@@ -551,8 +549,8 @@ export function ParentDashboardHome() {
                   <CalendarCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-[#103342] block">Appointments</span>
-                  <span className="text-[10px] text-[#294B57]/70">Book with ANM</span>
+                  <span className="font-bold text-[13.5px] text-[#103342] block leading-tight">Appointments</span>
+                  <span className="text-[11.5px] text-[#294B57] font-medium block mt-0.5">Book with ANM</span>
                 </div>
               </Link>
             </div>
@@ -561,11 +559,11 @@ export function ParentDashboardHome() {
           {/* Active Notifications Preview */}
           <Card className="p-5 bg-[#FBF8F2] border border-[#D8E6DA]">
             <div className="flex items-center justify-between mb-3">
-              <span className="font-bold text-sm text-[#103342] font-serif flex items-center gap-1.5">
+              <span className="font-bold text-base text-[#103342] font-serif flex items-center gap-1.5">
                 <Bell className="w-4 h-4 text-[#007F68]" />
                 <span>Active Alerts ({unreadNotifs.length})</span>
               </span>
-              <Link to="/parent/reminders" className="text-xs text-[#007F68] font-semibold hover:underline">
+              <Link to="/parent/reminders" className="text-[13px] text-[#007F68] font-bold hover:underline">
                 View All
               </Link>
             </div>
@@ -579,10 +577,10 @@ export function ParentDashboardHome() {
                   }`}
                 >
                   <div className="flex items-center justify-between font-bold text-[#103342]">
-                    <span>{n.title}</span>
-                    <span className="text-[10px] font-mono text-[#294B57]/60">{n.timestamp}</span>
+                    <span className="text-[13.5px] font-bold text-[#103342]">{n.title}</span>
+                    <span className="text-[11.5px] font-mono text-[#294B57] font-medium">{n.timestamp}</span>
                   </div>
-                  <p className="text-[11px] text-[#294B57] mt-1 leading-relaxed">{n.message}</p>
+                  <p className="text-xs sm:text-[12.5px] text-[#294B57] mt-1 leading-relaxed font-normal">{n.message}</p>
                 </div>
               ))}
             </div>

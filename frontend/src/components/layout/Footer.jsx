@@ -39,8 +39,10 @@ export function Footer() {
             <ul className="space-y-2 text-slate-300 text-xs">
               <li><Link to="/parent/help" className="hover:text-white transition-colors">Help Centre & FAQs</Link></li>
               <li><Link to="/parent/appointments" className="hover:text-white transition-colors">Contact Village ANM</Link></li>
-              <li><Link to="/auth/login" className="hover:text-white transition-colors">Caregiver Login</Link></li>
-              <li><Link to="/auth/login" className="hover:text-white transition-colors">Health Worker Portal</Link></li>
+              <li><Link to="/auth/login?role=parent" state={{ role: 'parent', from: '/parent/dashboard' }} className="hover:text-white transition-colors">Caregiver Login</Link></li>
+              <li><Link to="/auth/login?role=worker" state={{ role: 'worker', from: '/worker/dashboard' }} className="hover:text-white transition-colors">Health Worker Portal</Link></li>
+              <li><a href="mailto:support@navjyoti.gov.in" className="hover:text-white transition-colors">Email: support@navjyoti.gov.in</a></li>
+              <li><a href="tel:1075" className="hover:text-white transition-colors">Helpline: 1075 (Toll-Free)</a></li>
             </ul>
           </div>
 

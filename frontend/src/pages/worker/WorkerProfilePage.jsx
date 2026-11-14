@@ -94,7 +94,26 @@ export function WorkerProfilePage() {
 
             <div className="space-y-2 text-xs text-[#294B57] border-t border-[#D8E6DA] pt-3">
               <p><strong>Worker ID:</strong> <span className="font-mono font-bold text-[#103342]">{user?.workerId || "ANM-UP-BLS-4019"}</span></p>
-              <p><strong>Official Mobile:</strong> {user?.phone || "+91 94123 99887"}</p>
+              <p>
+                <strong>Official Mobile:</strong>{' '}
+                <a
+                  href={`tel:${(user?.phone || '+91 94123 99887').replace(/\s+/g, '')}`}
+                  className="underline hover:text-[#007F68] font-mono"
+                  title="Call Official Mobile"
+                >
+                  {user?.phone || '+91 94123 99887'}
+                </a>
+              </p>
+              <p>
+                <strong>Support Desk:</strong>{' '}
+                <a
+                  href="mailto:support@navjyoti.gov.in"
+                  className="underline hover:text-[#007F68]"
+                  title="Email Support Desk"
+                >
+                  support@navjyoti.gov.in
+                </a>
+              </p>
               <p><strong>Designation:</strong> Primary Healthcare Frontline Vaccinator</p>
               <p><strong>Session Duty:</strong> Weekly Wednesday VHND Lead</p>
             </div>

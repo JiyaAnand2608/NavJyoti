@@ -24,6 +24,8 @@ const SCHEMA_VERSION = 2;
 const STORAGE_KEYS = {
   SCHEMA_VERSION: 'navjyoti_schema_version',
   SESSION: 'navjyoti_session',
+  PARENT_SESSION: 'navjyoti_parent_session',
+  WORKER_SESSION: 'navjyoti_worker_session',
   ACCOUNTS: 'navjyoti_accounts',
   CHILDREN: 'navjyoti_children',
   APPOINTMENTS: 'navjyoti_appointments',
@@ -165,26 +167,54 @@ export function initializeStorage() {
     safeSet(STORAGE_KEYS.COMMUNICATIONS, DEFAULT_COMMUNICATIONS);
     safeSet(STORAGE_KEYS.SCHEMA_VERSION, SCHEMA_VERSION);
   }
+
+  // Hydrate separate role sessions from existing legacy session if needed
+  const legacySession = safeGet(STORAGE_KEYS.SESSION, null);
+  if (legacySession && legacySession.role) {
+    if (legacySession.role === 'parent' && !safeGet(STORAGE_KEYS.PARENT_SESSION, null)) {
+      safeSet(STORAGE_KEYS.PARENT_SESSION, legacySession);
+    } else if ((legacySession.role === 'worker' || legacySession.role === 'supervisor') && !safeGet(STORAGE_KEYS.WORKER_SESSION, null)) {
+      safeSet(STORAGE_KEYS.WORKER_SESSION, legacySession);
+    }
+  }
 }
 
 /**
  * SESSION MANAGEMENT
  * Policy: 7 days validity for demo prototype.
+ * Parent and Worker authentication states are maintained independently.
  */
 const SESSION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
-export function getSession() {
-  const session = safeGet(STORAGE_KEYS.SESSION, null);
+export function getParentSession() {
+  const session = safeGet(STORAGE_KEYS.PARENT_SESSION, null);
   if (!session) return null;
-
-  // Check expiration
   if (session.expiresAt && Date.now() > session.expiresAt) {
-    console.info("[NavJyoti Storage] Demo session expired. Clearing.");
-    clearSession();
+    clearParentSession();
     return null;
   }
-
   return session;
+}
+
+export function getWorkerSession() {
+  const session = safeGet(STORAGE_KEYS.WORKER_SESSION, null);
+  if (!session) return null;
+  if (session.expiresAt && Date.now() > session.expiresAt) {
+    clearWorkerSession();
+    return null;
+  }
+  return session;
+}
+
+export function getSession(roleKey = null) {
+  if (roleKey === 'parent') return getParentSession();
+  if (roleKey === 'worker' || roleKey === 'supervisor') return getWorkerSession();
+
+  const session = safeGet(STORAGE_KEYS.SESSION, null);
+  if (session && (!session.expiresAt || Date.now() <= session.expiresAt)) {
+    return session;
+  }
+  return getParentSession() || getWorkerSession();
 }
 
 export function saveSession(user) {
@@ -198,17 +228,47 @@ export function saveSession(user) {
     workerId: user.workerId,
     designation: user.designation,
     jurisdiction: user.jurisdiction,
+    village: user.village,
     loginAt: Date.now(),
     expiresAt: Date.now() + SESSION_EXPIRY_MS,
     sessionVersion: SCHEMA_VERSION,
   };
 
+  if (user.role === 'parent') {
+    safeSet(STORAGE_KEYS.PARENT_SESSION, session);
+  } else if (user.role === 'worker' || user.role === 'supervisor') {
+    safeSet(STORAGE_KEYS.WORKER_SESSION, session);
+  }
   safeSet(STORAGE_KEYS.SESSION, session);
   return session;
 }
 
-export function clearSession() {
-  localStorage.removeItem(STORAGE_KEYS.SESSION);
+export function clearParentSession() {
+  localStorage.removeItem(STORAGE_KEYS.PARENT_SESSION);
+  const general = safeGet(STORAGE_KEYS.SESSION, null);
+  if (general && general.role === 'parent') {
+    localStorage.removeItem(STORAGE_KEYS.SESSION);
+  }
+}
+
+export function clearWorkerSession() {
+  localStorage.removeItem(STORAGE_KEYS.WORKER_SESSION);
+  const general = safeGet(STORAGE_KEYS.SESSION, null);
+  if (general && (general.role === 'worker' || general.role === 'supervisor')) {
+    localStorage.removeItem(STORAGE_KEYS.SESSION);
+  }
+}
+
+export function clearSession(role = null) {
+  if (role === 'parent') {
+    clearParentSession();
+  } else if (role === 'worker' || role === 'supervisor') {
+    clearWorkerSession();
+  } else {
+    localStorage.removeItem(STORAGE_KEYS.SESSION);
+    localStorage.removeItem(STORAGE_KEYS.PARENT_SESSION);
+    localStorage.removeItem(STORAGE_KEYS.WORKER_SESSION);
+  }
 }
 
 /**

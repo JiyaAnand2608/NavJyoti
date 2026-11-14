@@ -264,7 +264,13 @@ export function ChildRegistryPage() {
                     </td>
                     <td className="py-3.5 px-3">
                       <span className="font-semibold text-[#103342]">{child.caregiverName}</span>
-                      <span className="block text-[10px] text-[#294B57]/70 font-mono">{child.caregiverPhone}</span>
+                      <a
+                        href={`tel:${child.caregiverPhone?.replace(/\s+/g, '')}`}
+                        className="block text-[10px] text-[#294B57]/80 font-mono hover:text-[#007F68] hover:underline"
+                        title="Call Caregiver"
+                      >
+                        {child.caregiverPhone}
+                      </a>
                     </td>
                     <td className="py-3.5 px-3">
                       <span className="font-semibold text-[#103342]">{child.village}</span>

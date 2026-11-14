@@ -74,24 +74,6 @@ export function LandingPage() {
               fill="url(#hillGrad1)"
             />
 
-            {/* Rising Half Sun on the Upper Right */}
-            <g transform="translate(1160, 140)">
-              {/* Radial Dashed Sun Rays */}
-              <line x1="0" y1="-56" x2="0" y2="-72" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
-              <line x1="28" y1="-50" x2="38" y2="-66" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
-              <line x1="52" y1="-30" x2="68" y2="-40" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
-              <line x1="64" y1="-6" x2="80" y2="-6" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
-              <line x1="-28" y1="-50" x2="-38" y2="-66" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
-              <line x1="-52" y1="-30" x2="-68" y2="-40" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
-              <line x1="-64" y1="-6" x2="-80" y2="-6" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
-
-              {/* Sun Semi-Circle */}
-              <path
-                d="M -54 0 A 54 54 0 0 1 54 0 Z"
-                fill="url(#sunGlow)"
-              />
-            </g>
-
             {/* Foreground Wave / Hill */}
             <path
               d="M-50 360 C 320 270, 720 380, 1080 280 C 1260 230, 1400 270, 1500 280 L 1500 460 L -50 460 Z"
@@ -190,9 +172,39 @@ export function LandingPage() {
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Floating Tilted Checklist Panel */}
+            {/* RIGHT COLUMN: Floating Tilted Checklist Panel with Responsive Rising Sun */}
             <div className="lg:col-span-5 flex items-center justify-center relative">
               <div className="relative w-full max-w-[340px] sm:max-w-[360px] py-4">
+                {/* Responsive Rising Sun: anchored to the card's top-right corner so it remains visible at all screen widths */}
+                <div className="absolute -top-7 -right-6 sm:-top-9 sm:-right-8 pointer-events-none select-none z-0">
+                  <svg
+                    viewBox="-85 -85 170 170"
+                    className="w-28 h-28 sm:w-32 sm:h-32"
+                    fill="none"
+                  >
+                    <defs>
+                      <linearGradient id="sunGlowCard" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#FDE68A" stopOpacity="0.95" />
+                        <stop offset="100%" stopColor="#F4B83F" stopOpacity="0.95" />
+                      </linearGradient>
+                    </defs>
+                    {/* Radial Sun Rays */}
+                    <line x1="0" y1="-56" x2="0" y2="-72" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+                    <line x1="28" y1="-50" x2="38" y2="-66" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+                    <line x1="52" y1="-30" x2="68" y2="-40" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+                    <line x1="64" y1="-6" x2="80" y2="-6" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+                    <line x1="-28" y1="-50" x2="-38" y2="-66" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+                    <line x1="-52" y1="-30" x2="-68" y2="-40" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+                    <line x1="-64" y1="-6" x2="-80" y2="-6" stroke="#F4B83F" strokeWidth="3" strokeLinecap="round" />
+
+                    {/* Sun Semi-Circle */}
+                    <path
+                      d="M -54 0 A 54 54 0 0 1 54 0 Z"
+                      fill="url(#sunGlowCard)"
+                    />
+                  </svg>
+                </div>
+
                 {/* Floating Ivory Card with completed-state checkmarks */}
                 <div className="relative z-10 w-full rounded-2xl sm:rounded-3xl bg-[#FBF8F2] p-5 sm:p-6 shadow-[0_12px_32px_rgba(16,51,66,0.08),0_4px_12px_rgba(16,51,66,0.04)] border border-[#D8E6DA] transform rotate-[-2.5deg] hover:rotate-0 transition-transform duration-300">
                   <div className="space-y-3">

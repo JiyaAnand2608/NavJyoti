@@ -68,8 +68,13 @@ export function MobileNavDrawer({ isOpen, onClose }) {
         <div>
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-white p-0.5 overflow-hidden flex items-center justify-center shrink-0">
+            <Link
+              to={isWorker ? "/worker/dashboard" : "/parent/dashboard"}
+              onClick={onClose}
+              className="flex items-center gap-3 group"
+              title="Return to Portal Dashboard"
+            >
+              <div className="w-9 h-9 rounded-xl bg-white p-0.5 overflow-hidden flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                 <img
                   src="/logo.jpg"
                   alt="NavJyoti"
@@ -82,7 +87,7 @@ export function MobileNavDrawer({ isOpen, onClose }) {
                   {isWorker ? "Worker Portal" : "Parent Portal"}
                 </span>
               </div>
-            </div>
+            </Link>
             <button
               onClick={onClose}
               className="p-1 rounded-lg text-slate-300 hover:bg-white/10 cursor-pointer"
@@ -119,10 +124,16 @@ export function MobileNavDrawer({ isOpen, onClose }) {
         <div className="pt-4 border-t border-white/10 space-y-2">
           <button
             onClick={() => {
-              switchRole(isWorker ? 'parent' : 'worker');
               onClose();
+              if (isWorker) {
+                switchRole('parent');
+                navigate('/auth/login?role=parent', { state: { role: 'parent', from: '/parent/dashboard' } });
+              } else {
+                switchRole('worker');
+                navigate('/auth/login?role=worker', { state: { role: 'worker', from: '/worker/dashboard' } });
+              }
             }}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-white/10 text-xs font-medium hover:bg-white/15 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-white/10 text-xs font-medium hover:bg-white/15 cursor-pointer text-white"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Switch to {isWorker ? 'Parent Portal' : 'Worker Portal'}</span>

@@ -5,10 +5,12 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 // Layout
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { ProtectedRoute } from './ProtectedRoute';
+import { DocumentMeta } from '../components/common/DocumentMeta';
 
 // Public pages
 import { LandingPage } from '../pages/public/LandingPage';
 import { QrLookupPage } from '../pages/public/QrLookupPage';
+import { NotFoundPage } from '../pages/public/NotFoundPage';
 
 // Authentication pages
 import { RoleSelectionPage } from '../pages/auth/RoleSelectionPage';
@@ -144,8 +146,34 @@ export function AppRoutes() {
             path="profile"
             element={<ParentProfilePage />}
           />
+    <>
+      <DocumentMeta />
+      <Routes>
+        {/* Public Pages */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/records/lookup/:qrToken" element={<QrLookupPage />} />
+
+        {/* Auth & Onboarding */}
+        <Route path="/auth/select-role" element={<RoleSelectionPage />} />
+        <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/auth/register" element={<RegisterPage />} />
+        <Route path="/auth/jurisdiction" element={<JurisdictionVerifyPage />} />
+
+        {/* Protected Parent Routes */}
+        <Route element={<ProtectedRoute allowedRoles={['parent']} />}>
+          <Route path="/parent" element={<DashboardLayout />}>
+            <Route index element={<Navigate to="/parent/dashboard" replace />} />
+            <Route path="dashboard" element={<ParentDashboardHome />} />
+            <Route path="children" element={<MyChildrenPage />} />
+            <Route path="vaccines" element={<VaccinationTrackerPage />} />
+            <Route path="milestones" element={<DevelopmentalPage />} />
+            <Route path="records" element={<DigitalHealthRecordsPage />} />
+            <Route path="reminders" element={<RemindersPage />} />
+            <Route path="appointments" element={<ParentAppointmentsPage />} />
+            <Route path="help" element={<HelpSupportPage />} />
+            <Route path="profile" element={<ParentProfilePage />} />
+          </Route>
         </Route>
-      </Route>
 
       {/* ==========================================
           HEALTH WORKER ROUTES
@@ -214,8 +242,21 @@ export function AppRoutes() {
             path="profile"
             element={<WorkerProfilePage />}
           />
+        {/* Protected Health Worker Routes */}
+        <Route element={<ProtectedRoute allowedRoles={['worker', 'supervisor']} />}>
+          <Route path="/worker" element={<DashboardLayout />}>
+            <Route index element={<Navigate to="/worker/dashboard" replace />} />
+            <Route path="dashboard" element={<WorkerDashboardOverview />} />
+            <Route path="registry" element={<ChildRegistryPage />} />
+            <Route path="children/:id" element={<ChildDetailPage />} />
+            <Route path="vaccinations" element={<VaccinationMgmtPage />} />
+            <Route path="priority" element={<PriorityFollowUpPage />} />
+            <Route path="appointments" element={<WorkerAppointmentsPage />} />
+            <Route path="messages" element={<CommunicationCenterPage />} />
+            <Route path="qr-handoff" element={<QrHandoffPage />} />
+            <Route path="profile" element={<WorkerProfilePage />} />
+          </Route>
         </Route>
-      </Route>
 
       {/* ==========================================
           SUPERVISOR ROUTES
@@ -244,8 +285,13 @@ export function AppRoutes() {
             path="analytics"
             element={<SupervisorAnalyticsPage />}
           />
+        {/* Protected Supervisor Analytics Route */}
+        <Route element={<ProtectedRoute allowedRoles={['worker', 'supervisor']} />}>
+          <Route path="/supervisor" element={<DashboardLayout />}>
+            <Route index element={<Navigate to="/supervisor/analytics" replace />} />
+            <Route path="analytics" element={<SupervisorAnalyticsPage />} />
+          </Route>
         </Route>
-      </Route>
 
       {/* UNKNOWN ROUTES */}
       <Route
@@ -254,5 +300,9 @@ export function AppRoutes() {
       />
 
     </Routes>
+        {/* Fallback to custom 404 Not Found Page */}
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </>
   );
 }

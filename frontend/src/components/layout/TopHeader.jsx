@@ -16,34 +16,15 @@ import {
   UserRound,
   CalendarCheck,
 } from 'lucide-react';
-
-function getAgeMonths(dateOfBirth) {
-  if (!dateOfBirth) return null;
-
-  const dob = new Date(
-    `${String(dateOfBirth).slice(0, 10)}T00:00:00`
-  );
-
-  const today = new Date();
-
-  if (Number.isNaN(dob.getTime()) || dob > today) {
-    return null;
-  }
-
-  let months =
-    (today.getFullYear() - dob.getFullYear()) * 12 +
-    today.getMonth() -
-    dob.getMonth();
-
-  if (today.getDate() < dob.getDate()) {
-    months -= 1;
-  }
-
-  return Math.max(0, months);
-}
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 export function TopHeader({ onOpenMobileNav }) {
-  const { user, role } = useAuth();
+  const { role, user, switchRole } = useAuth();
+  const { activeChild, childrenList, setActiveChildId } = useHealthData();
+  const { lang, toggleLanguage } = useLanguage();
+  const { isSimulatedOffline, toggleOfflineMode, pendingSyncCount, triggerSimulatedSync, isSyncing } = useOffline();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const {
     activeChild,
@@ -76,6 +57,22 @@ export function TopHeader({ onOpenMobileNav }) {
     user?.email?.trim()?.charAt(0)?.toUpperCase() ||
     'N';
 
+  const handleRoleSwitch = () => {
+    if (isWorker) {
+      // Switching from Worker to Parent: clear destination session to require login
+      switchRole('parent');
+      navigate('/auth/login?role=parent', {
+        state: { role: 'parent', from: '/parent/dashboard' },
+      });
+    } else {
+      // Switching from Parent to Worker: clear destination session to require login
+      switchRole('worker');
+      navigate('/auth/login?role=worker', {
+        state: { role: 'worker', from: '/worker/dashboard' },
+      });
+    }
+  };
+
   return (
     <header className="sticky top-0 z-20 h-16 bg-[#FBF8F2]/95 backdrop-blur-md border-b border-[#D8E6DA] px-4 sm:px-6 flex items-center justify-between gap-4 transition-colors">
 
@@ -91,26 +88,17 @@ export function TopHeader({ onOpenMobileNav }) {
           <Menu className="w-5 h-5" />
         </button>
 
-        {/* PARENT: ACTIVE CHILD */}
-        {isParent && (
-          <div className="flex items-center gap-2 min-w-0">
-
-            {childrenList.length > 0 ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#DDF0E3] border border-[#D8E6DA] text-xs max-w-full">
-
-                <Baby className="w-4 h-4 text-[#007F68] shrink-0" />
-
-                <span className="text-[#294B57] font-medium hidden sm:inline">
-                  Child:
-                </span>
-
+        {/* Role context details */}
+        {!isWorker ? (
+          childrenList && childrenList.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#DDF0E3] border border-[#D8E6DA] text-xs sm:text-[13px]">
+                <Baby className="w-4 h-4 text-[#007F68]" />
+                <span className="text-[#294B57] font-semibold">Child:</span>
                 <select
-                  aria-label="Select child"
-                  value={activeChild?.id ?? ''}
-                  onChange={(event) =>
-                    setActiveChildId(event.target.value)
-                  }
-                  className="bg-transparent font-bold text-[#103342] focus:outline-none cursor-pointer min-w-0 max-w-48"
+                  value={activeChild?.id || ''}
+                  onChange={(e) => setActiveChildId(e.target.value)}
+                  className="bg-transparent font-bold text-[#103342] focus:outline-none cursor-pointer text-xs sm:text-[13px]"
                 >
                   {childrenList.map((child) => {
                     const ageMonths = getAgeMonths(
@@ -129,37 +117,75 @@ export function TopHeader({ onOpenMobileNav }) {
                 </select>
 
               </div>
-            ) : (
-              <span className="text-xs text-[#294B57] font-medium">
-                No child linked yet
+            </div>
+          ) : (
+            <span className="text-[13px] text-[#294B57] font-medium">No child linked yet</span>
+          )
+        ) : (
+          /* Health Worker Sub-centre badge */
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-xs sm:text-[13px]">
+              <span className="text-[10.5px] uppercase font-bold text-[#007F68] bg-[#DDF0E3] px-2 py-0.5 rounded-md">Worker</span>
+              <Building2 className="w-4 h-4 text-[#007F68]" />
+              <span className="font-bold text-[#103342]">
+                {user?.jurisdiction?.subCentre || "Rampur Sub-Centre"}
               </span>
-            )}
-
+              <span className="text-[#A8D5B5]">|</span>
+              <span className="text-[#294B57] font-medium">{user?.jurisdiction?.phc || "Bilaspur PHC"}</span>
+            </div>
           </div>
         )}
 
-        {/* WORKER: ROLE OR VERIFIED JURISDICTION */}
-        {isWorker && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-xs">
+      {/* Right: Role Switcher, Offline Simulator, Language & Actions */}
+      <div className="flex items-center gap-2.5">
+        <div className="hidden lg:block">
+          <SimulationBadge label="Demo Simulation" />
+        </div>
 
-            <Building2 className="w-4 h-4 text-[#007F68] shrink-0" />
+        {/* Top-Bar Role Switcher Option */}
+        <button
+          onClick={handleRoleSwitch}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#007F68]/30 bg-[#E8F5E9] hover:bg-[#DDF0E3] text-[#007F68] text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+          title={isWorker ? "Switch to Parent Portal (Authentication Required)" : "Switch to Worker Portal (Authentication Required)"}
+        >
+          <RefreshCw className="w-3.5 h-3.5 text-[#007F68]" />
+          <span>{isWorker ? "Switch to Parent" : "Switch to Worker"}</span>
+        </button>
 
-            <span className="font-bold text-[#103342] truncate">
-              {user?.jurisdiction?.subCentre ||
-                'Health Worker Portal'}
-            </span>
+        {/* Offline Simulation Button */}
+        <button
+          onClick={toggleOfflineMode}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+            isSimulatedOffline
+              ? 'bg-[#FDF8EF] text-[#B87D14] border-[#F4B83F]/50'
+              : 'bg-[#F0EBE1] text-[#294B57] border-[#D8E6DA] hover:bg-[#EAE5DC]'
+          }`}
+          title={isSimulatedOffline ? "Switch to Online" : "Test Simulated Offline Mode"}
+        >
+          {isSimulatedOffline ? (
+            <>
+              <WifiOff className="w-3.5 h-3.5 text-[#B87D14]" />
+              <span className="hidden sm:inline">Offline</span>
+            </>
+          ) : (
+            <>
+              <Wifi className="w-3.5 h-3.5 text-[#007F68]" />
+              <span className="hidden sm:inline">Online</span>
+            </>
+          )}
+        </button>
 
-            {user?.jurisdiction?.phc && (
-              <>
-                <span className="text-[#A8D5B5]">|</span>
-
-                <span className="text-[#294B57] hidden sm:inline truncate">
-                  {user.jurisdiction.phc}
-                </span>
-              </>
-            )}
-
-          </div>
+        {/* Pending Sync trigger */}
+        {isSimulatedOffline && (
+          <button
+            onClick={triggerSimulatedSync}
+            disabled={isSyncing}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#007F68] text-white text-xs font-medium shadow-xs hover:bg-[#005F52] cursor-pointer"
+            title="Simulate background sync with local queue"
+          >
+            <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span className="text-xs font-semibold">Sync ({pendingSyncCount})</span>
+          </button>
         )}
 
         {/* SUPERVISOR */}

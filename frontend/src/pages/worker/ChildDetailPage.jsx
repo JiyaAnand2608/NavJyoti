@@ -115,7 +115,18 @@ export function ChildDetailPage() {
                 Unique Child ID: <span className="font-mono font-bold text-[#007F68]">{child.id}</span> • {child.ageMonths} Months ({child.gender}) • DOB: {child.dob} • Blood: {child.bloodGroup || 'B+'}
               </p>
               <div className="mt-2 text-xs text-[#294B57] flex flex-wrap items-center gap-4">
-                <span>Caregiver: <strong className="text-[#103342]">{child.caregiverName}</strong> ({child.caregiverPhone})</span>
+                <span>
+                  Caregiver: <strong className="text-[#103342]">{child.caregiverName}</strong>{' '}
+                  (
+                  <a
+                    href={`tel:${child.caregiverPhone?.replace(/\s+/g, '')}`}
+                    className="underline hover:text-[#007F68]"
+                    title="Call Caregiver"
+                  >
+                    {child.caregiverPhone}
+                  </a>
+                  )
+                </span>
                 <span>Village: <strong className="text-[#103342]">{child.village}</strong> ({child.subCentre})</span>
                 <span>Assigned: <strong className="text-[#103342]">{child.assignedWorker || 'Rekha Devi (ANM)'}</strong></span>
               </div>

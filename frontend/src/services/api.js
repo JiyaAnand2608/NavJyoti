@@ -32,6 +32,10 @@ export const api = {
       }
 
       let account = storage.findAccountByPhoneOrId(identifier, role);
+      if (account && account.role !== role) {
+        throw new Error(`This credential belongs to a ${account.role} account. Please use the ${account.role} login portal.`);
+      }
+
       if (!account) {
         // Auto-provision demo account for friction-free simulation
         account = {

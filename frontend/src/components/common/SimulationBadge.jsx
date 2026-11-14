@@ -5,7 +5,7 @@ export function SimulationBadge({ label = "Simulated Feature", tooltip = "Protot
   return (
     <span
       title={tooltip}
-      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#F0EBE1] text-[#103342] border border-[#D8E6DA]"
+      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#F0EBE1] text-[#103342] border border-[#D8E6DA]"
     >
       <Sparkles className="w-3 h-3 text-[#F4B83F]" />
       <span>{label}</span>

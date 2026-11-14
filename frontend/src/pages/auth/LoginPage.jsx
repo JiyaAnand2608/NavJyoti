@@ -19,6 +19,10 @@ export function LoginPage() {
   const location = useLocation();
 
   const initialRole = location.state?.role || 'parent';
+  const searchParams = new URLSearchParams(location.search);
+  const queryRole = searchParams.get('role');
+  const intendedDestination = location.state?.from || null;
+  const initialRole = location.state?.role || queryRole || 'parent';
 
   const [selectedRole, setSelectedRole] = useState(initialRole);
   const [email, setEmail] = useState('');
@@ -32,6 +36,19 @@ export function LoginPage() {
     worker: '/worker/dashboard',
     supervisor: '/supervisor/analytics',
   };
+  // Sync selected role when query params or navigation state change
+  React.useEffect(() => {
+    const qRole = new URLSearchParams(location.search).get('role');
+    const target = location.state?.role || qRole;
+    if (target && (target === 'parent' || target === 'worker' || target === 'supervisor')) {
+      handleRoleTabChange(target);
+    }
+  }, [location.search, location.state]);
+
+  // Password reset modal
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetIdentifier, setResetIdentifier] = useState('');
+  const [resetFeedback, setResetFeedback] = useState('');
 
   const handleRoleTabChange = (role) => {
     setSelectedRole(role);
@@ -60,6 +77,29 @@ export function LoginPage() {
         throw new Error(
           `This account belongs to the ${user.role} role. Please select the correct role.`
         );
+    setTimeout(() => {
+      try {
+        loginWithIdentifier(identifier, selectedRole);
+        setIsSubmitting(false);
+
+        let dest = intendedDestination;
+        if (dest) {
+          if (selectedRole === 'parent' && !dest.startsWith('/parent')) dest = '/parent/dashboard';
+          if ((selectedRole === 'worker' || selectedRole === 'supervisor') && !dest.startsWith('/worker') && !dest.startsWith('/supervisor')) {
+            dest = selectedRole === 'supervisor' ? '/supervisor/analytics' : '/worker/dashboard';
+          }
+        } else {
+          dest =
+            selectedRole === 'worker'
+              ? '/worker/dashboard'
+              : selectedRole === 'supervisor'
+              ? '/supervisor/analytics'
+              : '/parent/dashboard';
+        }
+        navigate(dest, { replace: true });
+      } catch (err) {
+        setIsSubmitting(false);
+        setErrorMsg(err.message || 'Login failed. Please check credentials.');
       }
 
       // Redirect to the authenticated user's dashboard
@@ -80,6 +120,48 @@ export function LoginPage() {
     <div className="min-h-screen bg-[#F5F1E9] flex flex-col justify-between p-4 sm:p-6 lg:p-8 text-[#294B57]">
 
       {/* Header */}
+
+      let dest = intendedDestination;
+      if (dest) {
+        if (roleKey === 'parent' && !dest.startsWith('/parent')) dest = '/parent/dashboard';
+        if ((roleKey === 'worker' || roleKey === 'supervisor') && !dest.startsWith('/worker') && !dest.startsWith('/supervisor')) {
+          dest = roleKey === 'supervisor' ? '/supervisor/analytics' : '/worker/dashboard';
+        }
+      } else {
+        dest =
+          roleKey === 'worker'
+            ? '/worker/dashboard'
+            : roleKey === 'supervisor'
+            ? '/supervisor/analytics'
+            : '/parent/dashboard';
+      }
+      navigate(dest, { replace: true });
+    }, 300);
+  };
+
+  const handlePasswordResetSubmit = (e) => {
+    e.preventDefault();
+    if (!resetIdentifier.trim()) return;
+    const res = requestPasswordReset(resetIdentifier);
+    setResetFeedback(res.message);
+    setTimeout(() => {
+      setIsResetModalOpen(false);
+      setResetFeedback('');
+      setResetIdentifier('');
+    }, 3500);
+  };
+
+  return (
+    <div
+      className="min-h-screen w-full flex flex-col justify-between p-4 sm:p-6 lg:p-8 text-[#294B57] bg-cover bg-center bg-no-repeat bg-[#F5F1E9]"
+      style={{
+        backgroundImage: `url('/assets/Sage%20Arcs%20and%20Gentle%20Wellness%20Motifs.png')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      {/* Top Header */}
       <div className="max-w-md mx-auto w-full flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 group">
           <div className="w-10 h-10 rounded-xl bg-white p-0.5 overflow-hidden border border-[#D8E6DA] shadow-sm flex items-center justify-center">

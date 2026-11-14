@@ -21,7 +21,7 @@ export function Navbar() {
       <header className="sticky top-0 z-40 w-full bg-[#F5F1E9] border-b border-[#D8E6DA]/70 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           {/* Left: Official NavJyoti Logo & Brand */}
-          <Link to="/" className="flex items-center gap-3.5 group">
+          <Link to={isAuthenticated ? dashboardPath : "/"} className="flex items-center gap-3.5 group" title={isAuthenticated ? "Go to Dashboard" : "NavJyoti Home"}>
             {/* Logo container with 15-20% increased visible symbol scale & CSS crop */}
             <div className="relative w-12 h-12 sm:w-13 sm:h-13 rounded-2xl overflow-hidden bg-white flex items-center justify-center p-0.5 shadow-xs border border-[#D8E6DA] shrink-0 group-hover:scale-105 transition-transform">
               <img

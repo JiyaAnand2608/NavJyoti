@@ -18,6 +18,7 @@ export function VaccinationMgmtPage() {
   const [doseDate, setDoseDate] = useState(new Date().toISOString().split('T')[0]);
   const [doseNotes, setDoseNotes] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   // Collect pending/due doses across all children in cohort
   const allPendingDoses = [];
@@ -42,6 +43,7 @@ export function VaccinationMgmtPage() {
 
   const handleOpenAdministerModal = (dose) => {
     setSelectedDose(dose);
+    setErrorMsg('');
     setBatchNumber(`BATCH-2024-${Math.floor(100 + Math.random() * 900)}`);
     setDoseDate(new Date().toISOString().split('T')[0]);
     setDoseNotes('');
@@ -52,9 +54,15 @@ export function VaccinationMgmtPage() {
     e.preventDefault();
     if (!selectedDose) return;
 
+    if (!batchNumber.trim()) {
+      setErrorMsg('Please specify a valid UIP vaccine batch number before confirming administration.');
+      return;
+    }
+    setErrorMsg('');
+
     administerDose(selectedDose.childId, selectedDose.vaccineId, {
       vaccineName: selectedDose.vaccineName,
-      batch: batchNumber,
+      batch: batchNumber.trim(),
       facility,
       site,
       dateAdministered: doseDate,
@@ -63,8 +71,8 @@ export function VaccinationMgmtPage() {
     });
 
     setAdministerModalOpen(false);
-    setSuccessMsg(`Vaccine dose ${selectedDose.vaccineName} recorded for ${selectedDose.childName}.`);
-    setTimeout(() => setSuccessMsg(''), 4000);
+    setSuccessMsg(`Vaccine dose "${selectedDose.vaccineName}" successfully recorded for ${selectedDose.childName}.`);
+    setTimeout(() => setSuccessMsg(''), 4500);
   };
 
   return (
@@ -183,6 +191,11 @@ export function VaccinationMgmtPage() {
           subtitle={`Child: ${selectedDose.childName} (${selectedDose.childId})`}
         >
           <form onSubmit={handleConfirmAdminister} className="space-y-4 text-xs text-[#294B57]">
+            {errorMsg && (
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
+                {errorMsg}
+              </div>
+            )}
             <div className="p-3 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-[#005F52]">
               <strong>Official Clinical Action:</strong> This dose will be recorded into the state registry and will update the caregiver's digital health pass.
             </div>

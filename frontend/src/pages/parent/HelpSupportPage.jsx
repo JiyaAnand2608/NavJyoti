@@ -78,7 +78,7 @@ export function HelpSupportPage() {
         <div>
           <span className="font-bold text-sm block mb-0.5">Medical Emergency Disclaimer:</span>
           <span>
-            NavJyoti is an administrative tracking tool and observational support prototype. It is <strong>NOT</strong> an emergency medical response service. In acute life-threatening situations, high fever, or severe pediatric illness, immediately dial <strong>108 (Ambulance)</strong> or visit your nearest Community Health Centre / Emergency Hospital.
+            NavJyoti is an administrative tracking tool and observational support prototype. It is <strong>NOT</strong> an emergency medical response service. In acute life-threatening situations, high fever, or severe pediatric illness, immediately dial <a href="tel:108" className="font-bold underline hover:text-amber-800">108 (Ambulance)</a> or visit your nearest Community Health Centre / Emergency Hospital.
           </span>
         </div>
       </div>
@@ -91,7 +91,11 @@ export function HelpSupportPage() {
             <h3 className="font-bold text-sm text-[#103342]">National Health Helpline</h3>
             <p className="text-xs text-[#294B57] mt-1">Toll-Free 24x7 Mother & Child Health Line</p>
           </div>
-          <div className="text-xl font-bold text-[#007F68] mt-3">1075 / 104</div>
+          <div className="text-xl font-bold text-[#007F68] mt-3 flex items-center gap-2">
+            <a href="tel:1075" className="hover:underline" title="Call 1075">1075</a>
+            <span>/</span>
+            <a href="tel:104" className="hover:underline" title="Call 104">104</a>
+          </div>
         </Card>
 
         <Card className="p-5 bg-[#FBF8F2] border border-[#D8E6DA] text-[#103342] flex flex-col justify-between">
@@ -99,7 +103,18 @@ export function HelpSupportPage() {
             <MapPin className="w-6 h-6 mb-3 text-[#007F68]" />
             <h3 className="font-bold text-sm text-[#103342]">Assigned Frontline ANM</h3>
             <p className="text-xs text-[#294B57] mt-1">Rampur Sub-Centre • Sector 1</p>
-            <div className="text-xs font-semibold text-[#007F68] mt-1.5">ANM Rekha Devi: +91 94123 99887</div>
+            <div className="text-xs font-semibold text-[#007F68] mt-1.5">
+              ANM Rekha Devi:{' '}
+              <a href="tel:+919412399887" className="underline hover:text-[#005F52]" title="Call ANM">
+                +91 94123 99887
+              </a>
+            </div>
+            <div className="text-[11px] text-[#294B57] mt-1">
+              Support:{' '}
+              <a href="mailto:support@navjyoti.gov.in" className="underline hover:text-[#007F68]" title="Email Support">
+                support@navjyoti.gov.in
+              </a>
+            </div>
           </div>
           <button
             onClick={() => setIsContactModalOpen(true)}
@@ -115,7 +130,11 @@ export function HelpSupportPage() {
             <h3 className="font-bold text-sm text-[#103342]">Emergency Childline</h3>
             <p className="text-xs text-[#294B57] mt-1">Nationwide child protection & rescue assistance</p>
           </div>
-          <div className="text-xl font-bold text-[#B87D14] mt-3">1098</div>
+          <div className="text-xl font-bold text-[#B87D14] mt-3">
+            <a href="tel:1098" className="hover:underline" title="Call Emergency Childline">
+              1098
+            </a>
+          </div>
         </Card>
       </div>
 

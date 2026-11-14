@@ -21,6 +21,7 @@ export function ProtectedRoute({ allowedRoles = [] }) {
     isLoading,
   } = useAuth();
 
+  const { isRoleAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
   // Wait until authentication has finished restoring
@@ -86,6 +87,19 @@ export function ProtectedRoute({ allowedRoles = [] }) {
     return (
       <Navigate
         to={ROLE_HOME_PATHS[currentRole]}
+  // Determine required primary role for this route
+  const isWorkerRoute = allowedRoles.includes('worker') || allowedRoles.includes('supervisor');
+  const requiredRole = isWorkerRoute ? 'worker' : 'parent';
+
+  // Check role authorization for this specific role
+  const isAuthForRole = isRoleAuthenticated(requiredRole);
+
+  if (!isAuthForRole) {
+    // Access denied! Redirect to the appropriate role login page preserving destination
+    return (
+      <Navigate
+        to={`/auth/login?role=${requiredRole}`}
+        state={{ role: requiredRole, from: location.pathname }}
         replace
       />
     );

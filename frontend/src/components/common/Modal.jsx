@@ -41,20 +41,13 @@ export function Modal({
         aria-hidden="true"
       />
 
-      {/* Popup positioning */}
-      <div className="relative z-10 flex min-h-full items-center justify-center p-4 pointer-events-none">
-
-        {/* Sharp modal dialog */}
+      <div className="relative z-10 flex min-h-full items-center justify-center p-4 text-center pointer-events-none">
         <div
           role="dialog"
           aria-modal="true"
           aria-label={title}
           className={clsx(
-            'relative w-full pointer-events-auto',
-            'rounded-2xl bg-[#FBF8F2]',
-            'text-left shadow-2xl',
-            'border border-[#D8E6DA]',
-            'max-h-[90vh] overflow-y-auto',
+            "w-full transform overflow-hidden rounded-2xl bg-[#FBF8F2] text-left align-middle shadow-xl transition-all border border-[#D8E6DA] pointer-events-auto",
             maxWidth
           )}
           onClick={(e) => e.stopPropagation()}

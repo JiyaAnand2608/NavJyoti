@@ -11,14 +11,12 @@ export function RoleSelectionPage() {
   const navigate = useNavigate();
 
   const handleSelectRole = (roleKey) => {
-    loginWithDemo(roleKey);
-    if (roleKey === 'supervisor') {
-      navigate('/supervisor/analytics');
-    } else if (roleKey === 'worker') {
-      navigate('/worker/dashboard');
-    } else {
-      navigate('/parent/dashboard');
-    }
+    navigate(`/auth/login?role=${roleKey}`, {
+      state: {
+        role: roleKey,
+        from: roleKey === 'supervisor' ? '/supervisor/analytics' : roleKey === 'worker' ? '/worker/dashboard' : '/parent/dashboard',
+      },
+    });
   };
 
   return (

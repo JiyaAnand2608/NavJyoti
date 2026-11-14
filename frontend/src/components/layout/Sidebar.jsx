@@ -209,24 +209,9 @@ export function Sidebar({ collapsed = false, setCollapsed }) {
   const RoleIcon =
     configuration?.icon || ShieldCheck;
 
-  const displayName =
-    user?.name ||
-    user?.email ||
-    'Signed-in User';
-
-  const initials = displayName
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || '')
-    .join('');
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } finally {
-      navigate('/', { replace: true });
-    }
+  const handleLogout = () => {
+    logout();
+    navigate('/');
   };
 
   return (
@@ -241,13 +226,12 @@ export function Sidebar({ collapsed = false, setCollapsed }) {
     >
       {/* BRAND HEADER */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between">
-
         <Link
-          to="/"
+          to={isWorker ? "/worker/dashboard" : "/parent/dashboard"}
           className="flex items-center gap-3 overflow-hidden"
+          title="Return to Portal Dashboard"
         >
-          <div className="w-10 h-10 rounded-xl bg-white p-0.5 shrink-0 shadow-sm flex items-center justify-center overflow-hidden border border-[#D8E6DA]/50">
-
+          <div className="w-10 h-10 rounded-xl bg-white p-0.5 shrink-0 shadow-xs flex items-center justify-center overflow-hidden border border-[#D8E6DA]/50">
             <img
               src="/logo.jpg"
               alt="NavJyoti"
@@ -262,9 +246,8 @@ export function Sidebar({ collapsed = false, setCollapsed }) {
               <span className="text-lg font-bold font-serif tracking-tight text-white block">
                 NavJyoti
               </span>
-
-              <span className="block text-[9.5px] uppercase tracking-wider text-[#A8D5B5] font-semibold">
-                {portalName}
+              <span className="block text-[11px] uppercase tracking-wider text-[#A8D5B5] font-semibold">
+                {isWorker ? "Health Worker Portal" : "Caregiver Portal"}
               </span>
 
             </div>
@@ -272,75 +255,70 @@ export function Sidebar({ collapsed = false, setCollapsed }) {
         </Link>
       </div>
 
-      {/* AUTHENTICATED ROLE INDICATOR */}
+      {/* Role Display */}
       {!collapsed && (
         <div className="px-3 pt-3">
-
-          <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center gap-3">
-
-            <div className="w-8 h-8 rounded-lg bg-[#007F68]/30 text-[#A8D5B5] flex items-center justify-center shrink-0">
-              <RoleIcon className="w-4 h-4" />
-            </div>
-
-            <div className="min-w-0">
-              <span className="text-[10px] text-slate-400 block">
-                Signed in as
-              </span>
-
-              <span className="text-xs font-semibold text-white block truncate">
-                {roleLabel}
-              </span>
-            </div>
-
+          <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
+            <span className="text-slate-300 text-xs font-medium">Role:</span>
+            <span className="font-semibold text-xs text-white">
+              {isWorker ? "Worker" : "Parent"}
+            </span>
           </div>
         </div>
       )}
 
       {/* NAVIGATION */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <div className="text-[11px] uppercase font-bold tracking-wider text-[#A8D5B5] px-3 pb-1">
+          {!collapsed && "Primary"}
+        </div>
+        {primaryNav.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.name}
+              to={item.path}
+              className={({ isActive }) =>
+                clsx(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all group",
+                  isActive
+                    ? "bg-[#DDF0E3] text-[#007F68] shadow-xs font-bold"
+                    : "text-slate-200 hover:bg-white/10 hover:text-white"
+                )
+              }
+              title={collapsed ? item.name : undefined}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              {!collapsed && <span className="truncate">{item.name}</span>}
+            </NavLink>
+          );
+        })}
 
-        {primaryNav.length > 0 && (
-          <>
-            {!collapsed && (
-              <div className="text-[10px] uppercase font-bold tracking-wider text-[#A8D5B5]/80 px-3 pb-1">
-                Primary
-              </div>
-            )}
-
-            {primaryNav.map((item) => (
-              <NavigationItem
-                key={item.path}
-                item={item}
-                collapsed={collapsed}
-              />
-            ))}
-          </>
-        )}
-
-        {secondaryNav.length > 0 && (
-          <>
-            {!collapsed && (
-              <div className="pt-4 text-[10px] uppercase font-bold tracking-wider text-[#A8D5B5]/80 px-3 pb-1 border-t border-white/10 mt-3">
-                Secondary
-              </div>
-            )}
-
-            {secondaryNav.map((item) => (
-              <NavigationItem
-                key={item.path}
-                item={item}
-                collapsed={collapsed}
-              />
-            ))}
-          </>
-        )}
-
-        {!configuration && (
-          <div className="px-3 py-4 text-xs text-slate-300">
-            No navigation is available for this account role.
-          </div>
-        )}
-
+        {/* Secondary Navigation */}
+        <div className="pt-4 text-[11px] uppercase font-bold tracking-wider text-[#A8D5B5] px-3 pb-1 border-t border-white/10 mt-3">
+          {!collapsed && "Secondary"}
+        </div>
+        {secondaryNav.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.name}
+              to={item.path}
+              className={({ isActive }) =>
+                clsx(
+                  "flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] font-medium transition-all group",
+                  isActive
+                    ? "bg-[#DDF0E3] text-[#007F68] shadow-xs font-bold"
+                    : "text-slate-300 hover:bg-white/10 hover:text-white"
+                )
+              }
+              title={collapsed ? item.name : undefined}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              {!collapsed && <span className="truncate">{item.name}</span>}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* FOOTER / USER PROFILE */}
@@ -356,13 +334,11 @@ export function Sidebar({ collapsed = false, setCollapsed }) {
               </div>
 
               <div className="truncate flex-1">
-
-                <p className="text-xs font-semibold text-white truncate">
-                  {displayName}
+                <p className="text-[13.5px] font-bold text-white truncate">
+                  {user?.name || (isWorker ? 'Rekha Devi (ANM)' : 'Sunita Sharma')}
                 </p>
-
-                <p className="text-[10px] text-slate-300 truncate">
-                  {roleLabel}
+                <p className="text-[11.5px] text-slate-300 font-normal truncate">
+                  {isWorker ? 'Bilaspur PHC • UP' : 'Caregiver • Rampur'}
                 </p>
 
               </div>
@@ -373,7 +349,7 @@ export function Sidebar({ collapsed = false, setCollapsed }) {
 
               <Link
                 to="/"
-                className="flex-1 text-center py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-[11px] font-medium transition-colors"
+                className="flex-1 text-center py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-semibold transition-colors"
                 title="Return to Public Landing Page"
               >
                 Home

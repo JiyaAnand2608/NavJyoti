@@ -105,7 +105,26 @@ export function ParentProfilePage() {
 
             <div className="space-y-2 text-xs text-[#294B57] border-t border-[#D8E6DA]/70 pt-3">
               <p><strong>Caregiver ID:</strong> <span className="font-mono text-[#007F68]">{user?.id}</span></p>
-              <p><strong>Mobile Number:</strong> {user?.phone || "+91 98765 43210"}</p>
+              <p>
+                <strong>Mobile Number:</strong>{' '}
+                <a
+                  href={`tel:${(user?.phone || '+91 98765 43210').replace(/\s+/g, '')}`}
+                  className="underline hover:text-[#007F68] font-mono"
+                  title="Call Phone Number"
+                >
+                  {user?.phone || '+91 98765 43210'}
+                </a>
+              </p>
+              <p>
+                <strong>Support Desk:</strong>{' '}
+                <a
+                  href="mailto:support@navjyoti.gov.in"
+                  className="underline hover:text-[#007F68]"
+                  title="Email Support"
+                >
+                  support@navjyoti.gov.in
+                </a>
+              </p>
               <p><strong>Village / Ward:</strong> {user?.village || "Rampur"}</p>
               <p><strong>Assigned PHC:</strong> Bilaspur Primary Health Centre</p>
               <p><strong>State / Region:</strong> Uttar Pradesh (India)</p>

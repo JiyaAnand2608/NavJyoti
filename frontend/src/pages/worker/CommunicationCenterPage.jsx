@@ -112,7 +112,14 @@ export function CommunicationCenterPage() {
                     Child: <strong>{child.name}</strong> • {child.village}
                   </div>
                   <div className="text-[10px] text-[#294B57]/70 font-mono mt-0.5">
-                    {child.caregiverPhone}
+                    <a
+                      href={`tel:${child.caregiverPhone?.replace(/\s+/g, '')}`}
+                      className="hover:underline hover:text-[#007F68]"
+                      onClick={(e) => e.stopPropagation()}
+                      title="Call Caregiver"
+                    >
+                      {child.caregiverPhone}
+                    </a>
                   </div>
                 </div>
               ))}
@@ -187,7 +194,16 @@ export function CommunicationCenterPage() {
             <form onSubmit={handleSend} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-[#103342] mb-1">
-                  Recipient: <span className="font-bold">{selectedChild?.caregiverName}</span> ({selectedChild?.caregiverPhone})
+                  Recipient: <span className="font-bold">{selectedChild?.caregiverName}</span>{' '}
+                  (
+                  <a
+                    href={`tel:${selectedChild?.caregiverPhone?.replace(/\s+/g, '')}`}
+                    className="underline hover:text-[#007F68]"
+                    title="Call Caregiver"
+                  >
+                    {selectedChild?.caregiverPhone}
+                  </a>
+                  )
                 </label>
                 <textarea
                   rows={4}
@@ -223,7 +239,15 @@ export function CommunicationCenterPage() {
                 <div key={comm.id} className="p-3 bg-white rounded-xl border border-[#D8E6DA] space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-[#103342]">
-                      To: {comm.recipientName} ({comm.recipientPhone})
+                      To: {comm.recipientName} (
+                      <a
+                        href={`tel:${comm.recipientPhone?.replace(/\s+/g, '')}`}
+                        className="underline hover:text-[#007F68]"
+                        title="Call Caregiver"
+                      >
+                        {comm.recipientPhone}
+                      </a>
+                      )
                     </span>
                     <Badge variant="teal">{comm.status}</Badge>
                   </div>

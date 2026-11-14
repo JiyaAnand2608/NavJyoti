@@ -31,8 +31,8 @@ export function CardHeader({ children, className = '', title, subtitle, action }
     return (
       <div className={clsx("p-5 border-b border-[#D8E6DA]/70 flex items-start justify-between gap-4", className)}>
         <div>
-          {title && <h3 className="text-base font-semibold text-[#103342]">{title}</h3>}
-          {subtitle && <p className="text-xs text-[#294B57] mt-0.5">{subtitle}</p>}
+          {title && <h3 className="text-base font-bold text-[#103342] font-serif tracking-tight">{title}</h3>}
+          {subtitle && <p className="text-[13px] text-[#294B57] mt-1 leading-normal font-normal">{subtitle}</p>}
         </div>
         {action && <div>{action}</div>}
       </div>
