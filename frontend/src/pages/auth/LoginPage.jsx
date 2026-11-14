@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -18,7 +17,6 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const initialRole = location.state?.role || 'parent';
   const searchParams = new URLSearchParams(location.search);
   const queryRole = searchParams.get('role');
   const intendedDestination = location.state?.from || null;
@@ -36,19 +34,15 @@ export function LoginPage() {
     worker: '/worker/dashboard',
     supervisor: '/supervisor/analytics',
   };
+
   // Sync selected role when query params or navigation state change
-  React.useEffect(() => {
+  useEffect(() => {
     const qRole = new URLSearchParams(location.search).get('role');
     const target = location.state?.role || qRole;
     if (target && (target === 'parent' || target === 'worker' || target === 'supervisor')) {
       handleRoleTabChange(target);
     }
   }, [location.search, location.state]);
-
-  // Password reset modal
-  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
-  const [resetIdentifier, setResetIdentifier] = useState('');
-  const [resetFeedback, setResetFeedback] = useState('');
 
   const handleRoleTabChange = (role) => {
     setSelectedRole(role);
@@ -68,45 +62,29 @@ export function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      // Authenticate against FastAPI
+      // Authenticate against FastAPI backend
       const user = await login(email.trim(), password);
 
       // Prevent role mismatch
-      if (user.role !== selectedRole) {
+      if (user.role !== selectedRole && !(selectedRole === 'worker' && user.role === 'supervisor')) {
         logout();
         throw new Error(
           `This account belongs to the ${user.role} role. Please select the correct role.`
         );
-    setTimeout(() => {
-      try {
-        loginWithIdentifier(identifier, selectedRole);
-        setIsSubmitting(false);
-
-        let dest = intendedDestination;
-        if (dest) {
-          if (selectedRole === 'parent' && !dest.startsWith('/parent')) dest = '/parent/dashboard';
-          if ((selectedRole === 'worker' || selectedRole === 'supervisor') && !dest.startsWith('/worker') && !dest.startsWith('/supervisor')) {
-            dest = selectedRole === 'supervisor' ? '/supervisor/analytics' : '/worker/dashboard';
-          }
-        } else {
-          dest =
-            selectedRole === 'worker'
-              ? '/worker/dashboard'
-              : selectedRole === 'supervisor'
-              ? '/supervisor/analytics'
-              : '/parent/dashboard';
-        }
-        navigate(dest, { replace: true });
-      } catch (err) {
-        setIsSubmitting(false);
-        setErrorMsg(err.message || 'Login failed. Please check credentials.');
       }
 
-      // Redirect to the authenticated user's dashboard
-      navigate(dashboardPaths[user.role], {
-        replace: true,
-      });
+      // Redirect to intended destination or role dashboard
+      let dest = intendedDestination;
+      if (dest) {
+        if (selectedRole === 'parent' && !dest.startsWith('/parent')) dest = '/parent/dashboard';
+        if ((selectedRole === 'worker' || selectedRole === 'supervisor') && !dest.startsWith('/worker') && !dest.startsWith('/supervisor')) {
+          dest = selectedRole === 'supervisor' ? '/supervisor/analytics' : '/worker/dashboard';
+        }
+      } else {
+        dest = dashboardPaths[user.role] || '/parent/dashboard';
+      }
 
+      navigate(dest, { replace: true });
     } catch (error) {
       setErrorMsg(
         error.message || 'Login failed. Please try again.'
@@ -114,41 +92,6 @@ export function LoginPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#F5F1E9] flex flex-col justify-between p-4 sm:p-6 lg:p-8 text-[#294B57]">
-
-      {/* Header */}
-
-      let dest = intendedDestination;
-      if (dest) {
-        if (roleKey === 'parent' && !dest.startsWith('/parent')) dest = '/parent/dashboard';
-        if ((roleKey === 'worker' || roleKey === 'supervisor') && !dest.startsWith('/worker') && !dest.startsWith('/supervisor')) {
-          dest = roleKey === 'supervisor' ? '/supervisor/analytics' : '/worker/dashboard';
-        }
-      } else {
-        dest =
-          roleKey === 'worker'
-            ? '/worker/dashboard'
-            : roleKey === 'supervisor'
-            ? '/supervisor/analytics'
-            : '/parent/dashboard';
-      }
-      navigate(dest, { replace: true });
-    }, 300);
-  };
-
-  const handlePasswordResetSubmit = (e) => {
-    e.preventDefault();
-    if (!resetIdentifier.trim()) return;
-    const res = requestPasswordReset(resetIdentifier);
-    setResetFeedback(res.message);
-    setTimeout(() => {
-      setIsResetModalOpen(false);
-      setResetFeedback('');
-      setResetIdentifier('');
-    }, 3500);
   };
 
   return (
@@ -190,13 +133,11 @@ export function LoginPage() {
       {/* Login card */}
       <div className="max-w-md mx-auto w-full my-auto py-6">
         <div className="bg-[#FBF8F2] rounded-[28px] border border-[#D8E6DA] p-6 sm:p-8 shadow-sm relative overflow-hidden">
-
           {/* Accent */}
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#A8D5B5] via-[#007F68] to-[#F4B83F]" />
 
           {/* Role selection */}
           <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-[#F0EBE1] border border-[#D8E6DA] mb-6 text-xs font-semibold">
-
             <button
               type="button"
               onClick={() => handleRoleTabChange('parent')}
@@ -235,7 +176,6 @@ export function LoginPage() {
               <Building className="w-3.5 h-3.5" />
               Supervisor
             </button>
-
           </div>
 
           {/* Heading */}
@@ -247,7 +187,6 @@ export function LoginPage() {
                 ? 'Health Worker Sign In'
                 : 'Medical Officer Sign In'}
             </h1>
-
             <p className="text-xs text-[#294B57] mt-1">
               Sign in using your registered email and password.
             </p>
@@ -269,7 +208,6 @@ export function LoginPage() {
             onSubmit={handleLoginSubmit}
             className="space-y-4 text-xs"
           >
-
             <div>
               <label
                 htmlFor="login-email"
@@ -360,7 +298,7 @@ export function LoginPage() {
 
       {/* Footer */}
       <div className="max-w-md mx-auto w-full text-center text-xs text-[#294B57]/70 py-4 border-t border-[#D8E6DA]/60">
-        NavJyoti Health Record Portal • Development Environment
+        NavJyoti Health Record Portal • Connected to FastAPI & PostgreSQL
       </div>
     </div>
   );

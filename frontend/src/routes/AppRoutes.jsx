@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
@@ -45,121 +44,23 @@ import { SupervisorAnalyticsPage } from '../pages/supervisor/SupervisorAnalytics
 
 export function AppRoutes() {
   return (
-    <Routes>
-
-      {/* PUBLIC ROUTES */}
-      <Route
-        path="/"
-        element={<LandingPage />}
-      />
-
-      <Route
-        path="/records/lookup/:qrToken"
-        element={<QrLookupPage />}
-      />
-
-      {/* AUTHENTICATION ROUTES */}
-      <Route
-        path="/auth/select-role"
-        element={<RoleSelectionPage />}
-      />
-
-      <Route
-        path="/auth/login"
-        element={<LoginPage />}
-      />
-
-      <Route
-        path="/auth/register"
-        element={<RegisterPage />}
-      />
-
-      <Route
-        path="/auth/jurisdiction"
-        element={<JurisdictionVerifyPage />}
-      />
-
-      {/* ==========================================
-          PARENT ROUTES
-          Only authenticated parents can access.
-      ========================================== */}
-      <Route
-        element={
-          <ProtectedRoute allowedRoles={['parent']} />
-        }
-      >
-        <Route
-          path="/parent"
-          element={<DashboardLayout />}
-        >
-          <Route
-            index
-            element={
-              <Navigate
-                to="/parent/dashboard"
-                replace
-              />
-            }
-          />
-
-          <Route
-            path="dashboard"
-            element={<ParentDashboardHome />}
-          />
-
-          <Route
-            path="children"
-            element={<MyChildrenPage />}
-          />
-
-          <Route
-            path="vaccines"
-            element={<VaccinationTrackerPage />}
-          />
-
-          <Route
-            path="milestones"
-            element={<DevelopmentalPage />}
-          />
-
-          <Route
-            path="records"
-            element={<DigitalHealthRecordsPage />}
-          />
-
-          <Route
-            path="reminders"
-            element={<RemindersPage />}
-          />
-
-          <Route
-            path="appointments"
-            element={<ParentAppointmentsPage />}
-          />
-
-          <Route
-            path="help"
-            element={<HelpSupportPage />}
-          />
-
-          <Route
-            path="profile"
-            element={<ParentProfilePage />}
-          />
     <>
       <DocumentMeta />
       <Routes>
-        {/* Public Pages */}
+        {/* PUBLIC ROUTES */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/records/lookup/:qrToken" element={<QrLookupPage />} />
 
-        {/* Auth & Onboarding */}
+        {/* AUTHENTICATION ROUTES */}
         <Route path="/auth/select-role" element={<RoleSelectionPage />} />
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/register" element={<RegisterPage />} />
         <Route path="/auth/jurisdiction" element={<JurisdictionVerifyPage />} />
 
-        {/* Protected Parent Routes */}
+        {/* ==========================================
+            PARENT ROUTES
+            Only authenticated parents can access.
+        ========================================== */}
         <Route element={<ProtectedRoute allowedRoles={['parent']} />}>
           <Route path="/parent" element={<DashboardLayout />}>
             <Route index element={<Navigate to="/parent/dashboard" replace />} />
@@ -175,74 +76,10 @@ export function AppRoutes() {
           </Route>
         </Route>
 
-      {/* ==========================================
-          HEALTH WORKER ROUTES
-          Only authenticated workers can access.
-      ========================================== */}
-      <Route
-        element={
-          <ProtectedRoute allowedRoles={['worker']} />
-        }
-      >
-        <Route
-          path="/worker"
-          element={<DashboardLayout />}
-        >
-          <Route
-            index
-            element={
-              <Navigate
-                to="/worker/dashboard"
-                replace
-              />
-            }
-          />
-
-          <Route
-            path="dashboard"
-            element={<WorkerDashboardOverview />}
-          />
-
-          <Route
-            path="registry"
-            element={<ChildRegistryPage />}
-          />
-
-          <Route
-            path="children/:id"
-            element={<ChildDetailPage />}
-          />
-
-          <Route
-            path="vaccinations"
-            element={<VaccinationMgmtPage />}
-          />
-
-          <Route
-            path="priority"
-            element={<PriorityFollowUpPage />}
-          />
-
-          <Route
-            path="appointments"
-            element={<WorkerAppointmentsPage />}
-          />
-
-          <Route
-            path="messages"
-            element={<CommunicationCenterPage />}
-          />
-
-          <Route
-            path="qr-handoff"
-            element={<QrHandoffPage />}
-          />
-
-          <Route
-            path="profile"
-            element={<WorkerProfilePage />}
-          />
-        {/* Protected Health Worker Routes */}
+        {/* ==========================================
+            HEALTH WORKER ROUTES
+            Only authenticated workers can access.
+        ========================================== */}
         <Route element={<ProtectedRoute allowedRoles={['worker', 'supervisor']} />}>
           <Route path="/worker" element={<DashboardLayout />}>
             <Route index element={<Navigate to="/worker/dashboard" replace />} />
@@ -258,48 +95,17 @@ export function AppRoutes() {
           </Route>
         </Route>
 
-      {/* ==========================================
-          SUPERVISOR ROUTES
-          Only authenticated supervisors can access.
-      ========================================== */}
-      <Route
-        element={
-          <ProtectedRoute allowedRoles={['supervisor']} />
-        }
-      >
-        <Route
-          path="/supervisor"
-          element={<DashboardLayout />}
-        >
-          <Route
-            index
-            element={
-              <Navigate
-                to="/supervisor/analytics"
-                replace
-              />
-            }
-          />
-
-          <Route
-            path="analytics"
-            element={<SupervisorAnalyticsPage />}
-          />
-        {/* Protected Supervisor Analytics Route */}
-        <Route element={<ProtectedRoute allowedRoles={['worker', 'supervisor']} />}>
+        {/* ==========================================
+            SUPERVISOR ROUTES
+            Only authenticated supervisors can access.
+        ========================================== */}
+        <Route element={<ProtectedRoute allowedRoles={['supervisor', 'worker']} />}>
           <Route path="/supervisor" element={<DashboardLayout />}>
             <Route index element={<Navigate to="/supervisor/analytics" replace />} />
             <Route path="analytics" element={<SupervisorAnalyticsPage />} />
           </Route>
         </Route>
 
-      {/* UNKNOWN ROUTES */}
-      <Route
-        path="*"
-        element={<Navigate to="/" replace />}
-      />
-
-    </Routes>
         {/* Fallback to custom 404 Not Found Page */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

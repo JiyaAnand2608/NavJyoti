@@ -238,54 +238,49 @@ export function WorkerAppointmentsPage() {
         </div>
       )}
 
-      <div className="space-y-4">
-        {filteredAppointments.length === 0 ? (
-          <div className="p-12 text-center text-xs text-[#294B57] bg-[#FBF8F2] rounded-2xl border border-[#D8E6DA]">
-            No appointments in this category.
-          </div>
-        ) : (
-          filteredAppointments.map((apt) => (
-            <Card key={apt.id} className="p-5 bg-[#FBF8F2] border-[#D8E6DA]">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                    apt.status === 'confirmed' ? 'bg-[#DDF0E3] text-[#007F68]' :
-                    apt.status === 'completed' ? 'bg-[#103342] text-white' :
-                    apt.status === 'declined' || apt.status === 'cancelled' ? 'bg-red-50 text-red-500' :
-                    'bg-[#FDF8EF] text-[#B87D14]'
-                  }`}>
-                    <CalendarCheck className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm text-[#103342] font-serif">{apt.purpose}</h3>
-                      {apt.status === 'confirmed' && <Badge variant="upToDate">Confirmed</Badge>}
-                      {apt.status === 'completed' && <Badge variant="navy">Completed</Badge>}
-                      {apt.status === 'requested' && <Badge variant="dueSoon">Pending Acceptance</Badge>}
-                      {apt.status === 'declined' && <Badge variant="overdue">Declined</Badge>}
-                      {apt.status === 'cancelled' && <Badge variant="overdue">Cancelled</Badge>}
-                    </div>
-                    <p className="text-xs text-[#294B57] mt-1">
-                      Child: <strong className="text-[#103342]">{apt.childName}</strong> (ID: {apt.childId}) • Caregiver: {apt.caregiverName} (
-                      <a
-                        href={`tel:${apt.caregiverPhone?.replace(/\s+/g, '')}`}
-                        className="underline hover:text-[#007F68]"
-                        title="Call Caregiver"
-                      >
-                        {apt.caregiverPhone}
-                      </a>
-                      )
-                    </p>
-                    <p className="text-[11px] text-[#294B57]/80 mt-1 flex items-center gap-2">
-                      <Clock className="w-3.5 h-3.5 text-[#007F68]" />
-                      <span>Requested for {apt.requestedDate} at {apt.timeSlot} • Type: <strong className="capitalize">{apt.visitType?.replace('_', ' ')}</strong></span>
-                    </p>
-                    {apt.notes && (
-                      <p className="text-[11px] text-[#294B57]/70 mt-1 italic">Note: "{apt.notes}"</p>
-                    )}
-                  </div>
-                </div>
+      {/* SUCCESS */}
+      {successMsg && (
+        <div
+          role="status"
+          className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2"
+        >
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {successMsg}
+        </div>
+      )}
 
+      {/* ERROR */}
+      {(errorMsg || childrenError) && (
+        <div
+          role="alert"
+          className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2"
+        >
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {errorMsg || childrenError}
+        </div>
+      )}
+
+      {/* FILTER TABS */}
+      <div className="flex flex-wrap items-center gap-2">
+        {[
+          ['all', 'All'],
+          ['pending', 'Pending'],
+          ['approved', 'Approved'],
+          ['history', 'History'],
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setFilterStatus(value)}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold border cursor-pointer ${
+              filterStatus === value
+                ? 'bg-[#103342] text-white border-[#103342]'
+                : 'bg-[#FBF8F2] text-[#294B57] border-[#D8E6DA]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* APPOINTMENT LIST */}
@@ -358,6 +353,21 @@ export function WorkerAppointmentsPage() {
                           {getChildName(appointment.childId)}
                         </strong>
                       </p>
+
+                      {appointment.caregiverPhone && (
+                        <p className="text-xs text-[#294B57]">
+                          Caregiver: {appointment.caregiverName || 'Parent'}{' '}
+                          (
+                          <a
+                            href={`tel:${appointment.caregiverPhone.replace(/\s+/g, '')}`}
+                            className="underline hover:text-[#007F68]"
+                            title="Call Caregiver"
+                          >
+                            {appointment.caregiverPhone}
+                          </a>
+                          )
+                        </p>
+                      )}
 
                       <p className="text-[11px] text-[#294B57] flex items-center gap-2">
                         <Clock className="w-4 h-4 text-[#007F68]" />

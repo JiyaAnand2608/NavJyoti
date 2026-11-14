@@ -1,10 +1,11 @@
-
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { useHealthData } from '../../contexts/HealthDataContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useOffline } from '../../contexts/OfflineContext';
+import { SimulationBadge } from '../common/SimulationBadge';
 
 import {
   Menu,
@@ -13,26 +14,54 @@ import {
   Building2,
   Bell,
   ShieldCheck,
-  UserRound,
   CalendarCheck,
+  RefreshCw,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+
+function getAgeMonths(dateOfBirth) {
+  if (!dateOfBirth) return null;
+
+  const dob = new Date(
+    `${String(dateOfBirth).slice(0, 10)}T00:00:00`
+  );
+
+  const today = new Date();
+
+  if (Number.isNaN(dob.getTime()) || dob > today) {
+    return null;
+  }
+
+  let months =
+    (today.getFullYear() - dob.getFullYear()) * 12 +
+    today.getMonth() -
+    dob.getMonth();
+
+  if (today.getDate() < dob.getDate()) {
+    months -= 1;
+  }
+
+  return Math.max(0, months);
+}
 
 export function TopHeader({ onOpenMobileNav }) {
-  const { role, user, switchRole } = useAuth();
-  const { activeChild, childrenList, setActiveChildId } = useHealthData();
-  const { lang, toggleLanguage } = useLanguage();
-  const { isSimulatedOffline, toggleOfflineMode, pendingSyncCount, triggerSimulatedSync, isSyncing } = useOffline();
-  const navigate = useNavigate();
-  const location = useLocation();
-
+  const { user, role, switchRole } = useAuth();
   const {
     activeChild,
     childrenList = [],
     setActiveChildId,
   } = useHealthData();
-
   const { lang, toggleLanguage } = useLanguage();
+  const {
+    isSimulatedOffline,
+    toggleOfflineMode,
+    pendingSyncCount = 0,
+    triggerSimulatedSync,
+    isSyncing = false,
+  } = useOffline();
+
+  const navigate = useNavigate();
 
   const currentRole = user?.role || role;
 
@@ -59,13 +88,11 @@ export function TopHeader({ onOpenMobileNav }) {
 
   const handleRoleSwitch = () => {
     if (isWorker) {
-      // Switching from Worker to Parent: clear destination session to require login
       switchRole('parent');
       navigate('/auth/login?role=parent', {
         state: { role: 'parent', from: '/parent/dashboard' },
       });
     } else {
-      // Switching from Parent to Worker: clear destination session to require login
       switchRole('worker');
       navigate('/auth/login?role=worker', {
         state: { role: 'worker', from: '/worker/dashboard' },
@@ -75,10 +102,8 @@ export function TopHeader({ onOpenMobileNav }) {
 
   return (
     <header className="sticky top-0 z-20 h-16 bg-[#FBF8F2]/95 backdrop-blur-md border-b border-[#D8E6DA] px-4 sm:px-6 flex items-center justify-between gap-4 transition-colors">
-
       {/* LEFT: MOBILE MENU + ROLE CONTEXT */}
       <div className="flex items-center gap-3 min-w-0">
-
         <button
           type="button"
           onClick={onOpenMobileNav}
@@ -115,7 +140,6 @@ export function TopHeader({ onOpenMobileNav }) {
                     );
                   })}
                 </select>
-
               </div>
             </div>
           ) : (
@@ -136,8 +160,19 @@ export function TopHeader({ onOpenMobileNav }) {
           </div>
         )}
 
-      {/* Right: Role Switcher, Offline Simulator, Language & Actions */}
-      <div className="flex items-center gap-2.5">
+        {/* SUPERVISOR */}
+        {isSupervisor && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-xs">
+            <ShieldCheck className="w-4 h-4 text-[#007F68]" />
+            <span className="font-bold text-[#103342]">
+              Supervisor Portal
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* RIGHT: Role Switcher, Offline Simulator, Language & Actions */}
+      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
         <div className="hidden lg:block">
           <SimulationBadge label="Demo Simulation" />
         </div>
@@ -188,29 +223,6 @@ export function TopHeader({ onOpenMobileNav }) {
           </button>
         )}
 
-        {/* SUPERVISOR */}
-        {isSupervisor && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-xs">
-
-            <ShieldCheck className="w-4 h-4 text-[#007F68]" />
-
-            <span className="font-bold text-[#103342]">
-              Supervisor Portal
-            </span>
-
-          </div>
-        )}
-
-      </div>
-
-      {/* RIGHT: LANGUAGE + NAVIGATION */}
-      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-
-        {/* PROTOTYPE LABEL */}
-        <span className="hidden lg:inline-flex items-center px-3 py-1.5 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-[11px] font-semibold text-[#294B57]">
-          Hackathon Prototype
-        </span>
-
         {/* LANGUAGE SWITCHER */}
         <button
           type="button"
@@ -219,13 +231,10 @@ export function TopHeader({ onOpenMobileNav }) {
           title="Switch language"
           aria-label="Switch language"
         >
-
           <Languages className="w-4 h-4 text-[#007F68]" />
-
           <span>
             {lang === 'en' ? 'हिन्दी' : 'EN'}
           </span>
-
         </button>
 
         {/* PARENT NOTIFICATIONS */}
@@ -271,9 +280,7 @@ export function TopHeader({ onOpenMobileNav }) {
             {userInitial}
           </div>
         )}
-
       </div>
-
     </header>
   );
 }

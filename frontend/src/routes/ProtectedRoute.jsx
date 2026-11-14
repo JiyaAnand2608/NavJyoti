@@ -1,11 +1,5 @@
-
 import React from 'react';
-import {
-  Navigate,
-  Outlet,
-  useLocation,
-} from 'react-router-dom';
-
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const ROLE_HOME_PATHS = {
@@ -15,13 +9,7 @@ const ROLE_HOME_PATHS = {
 };
 
 export function ProtectedRoute({ allowedRoles = [] }) {
-  const {
-    user,
-    isAuthenticated,
-    isLoading,
-  } = useAuth();
-
-  const { isRoleAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
   // Wait until authentication has finished restoring
@@ -30,13 +18,10 @@ export function ProtectedRoute({ allowedRoles = [] }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F1E9] text-[#103342]">
         <div className="flex flex-col items-center gap-3">
-
           <div className="w-8 h-8 rounded-full border-2 border-[#007F68] border-t-transparent animate-spin" />
-
           <span className="text-xs font-semibold text-[#294B57]/70">
             Restoring NavJyoti session...
           </span>
-
         </div>
       </div>
     );
@@ -45,10 +30,12 @@ export function ProtectedRoute({ allowedRoles = [] }) {
   // A session must contain both an authenticated state
   // and a user account returned by the authentication flow.
   if (!isAuthenticated || !user) {
+    const isWorkerRoute = allowedRoles.includes('worker') || allowedRoles.includes('supervisor');
+    const requiredRole = isWorkerRoute ? 'worker' : 'parent';
     return (
       <Navigate
-        to="/auth/login"
-        state={{ from: location }}
+        to={`/auth/login?role=${requiredRole}`}
+        state={{ role: requiredRole, from: location }}
         replace
       />
     );
@@ -61,20 +48,15 @@ export function ProtectedRoute({ allowedRoles = [] }) {
   if (!ROLE_HOME_PATHS[currentRole]) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F1E9] px-4">
-
         <div className="max-w-md w-full bg-white border border-[#D8E6DA] rounded-2xl p-8 text-center">
-
           <h1 className="text-xl font-bold text-[#103342]">
             Account Role Not Recognised
           </h1>
-
           <p className="text-sm text-[#294B57] mt-3">
             Your account does not have a supported NavJyoti role.
             Please contact the application administrator.
           </p>
-
         </div>
-
       </div>
     );
   }
@@ -87,19 +69,6 @@ export function ProtectedRoute({ allowedRoles = [] }) {
     return (
       <Navigate
         to={ROLE_HOME_PATHS[currentRole]}
-  // Determine required primary role for this route
-  const isWorkerRoute = allowedRoles.includes('worker') || allowedRoles.includes('supervisor');
-  const requiredRole = isWorkerRoute ? 'worker' : 'parent';
-
-  // Check role authorization for this specific role
-  const isAuthForRole = isRoleAuthenticated(requiredRole);
-
-  if (!isAuthForRole) {
-    // Access denied! Redirect to the appropriate role login page preserving destination
-    return (
-      <Navigate
-        to={`/auth/login?role=${requiredRole}`}
-        state={{ role: requiredRole, from: location.pathname }}
         replace
       />
     );
