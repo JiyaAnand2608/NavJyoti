@@ -40,6 +40,28 @@ def get_database_url() -> str:
             database=db_name,
         ))
 
+    # Native self-contained PostgreSQL instance (pgserver)
+    try:
+        import pgserver
+        pgdata_dir = BASE_DIR.parent / "pgdata"
+        if not pgdata_dir.exists():
+            pgdata_dir.mkdir(parents=True, exist_ok=True)
+        srv = pgserver.get_server(pgdata_dir)
+        # Ensure 'navjyoti' database exists without noisy stderr
+        try:
+            check_sql = "SELECT 1 FROM pg_database WHERE datname = 'navjyoti';"
+            res = srv.psql(check_sql)
+            if "1" not in res:
+                srv.psql("CREATE DATABASE navjyoti;")
+        except Exception:
+            pass
+        pg_uri = srv.get_uri("navjyoti")
+        if pg_uri.startswith("postgresql://"):
+            pg_uri = pg_uri.replace("postgresql://", "postgresql+psycopg://", 1)
+        return pg_uri
+    except Exception:
+        pass
+
     # Safe fallback if unconfigured: default local postgresql URL string
     return "postgresql+psycopg://postgres:postgres@localhost:5432/navjyoti"
 

@@ -9,10 +9,11 @@
 The NavJyoti backend is implemented in **Python 3.12+ / FastAPI / SQLAlchemy 2.0 / Pydantic v2**.
 The frontend is built with **React 19 / Vite / Tailwind CSS v4**.
 
-- **Branch:** `feature/navjyoti-backend`
+- **Branch:** `feature/navjyoti-backend` (Verified Commit: `e514811f7e60d7f1b980981a16a0f72d53a165bd`)
 - **Backend Directory:** `/backend`
 - **Frontend Directory:** `/frontend`
-- **Current Database Engine:** SQLite in-memory for isolated automated unit tests; PostgreSQL adapter (`psycopg` binary v3.2.1) installed in virtual environment.
+- **Current Database Engine:** PostgreSQL 16 (Compatible with local PostgreSQL service, cloud PostgreSQL like Neon/Supabase/RDS, and self-contained embedded PostgreSQL via `pgserver`). SQLite in-memory engine retained exclusively for isolated unit tests.
+- **Test Suite Status:** 43/43 passing automated tests (37 core integration/unit tests + 6 live PostgreSQL end-to-end integration tests).
 
 ---
 
@@ -103,12 +104,12 @@ psql -U postgres -h localhost -p 5432 -d navjyoti -f backend/migrations/002_add_
 
 ## 5. Running and Verifying the Integration
 
-### 5.1 Run Automated Tests (All 37 Tests)
+### 5.1 Run Automated Tests (All 43 Tests)
 ```bash
 cd backend
 .venv\Scripts\python run_tests.py
 ```
-*(All 37 unit and integration tests run in ~3 seconds and must report OK).*
+*(All 43 unit, API security, phone auth, and PostgreSQL end-to-end integration tests execute in ~3.8 seconds and report OK).*
 
 ### 5.2 Start Backend Server
 ```bash

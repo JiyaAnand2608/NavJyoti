@@ -8,3 +8,4 @@ PyJWT
 email-validator
 httpx
 pytest
+pgserver>=0.1.4
