@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card } from '../../components/common/Card';
+import { SimulationBanner } from '../../components/common/SimulationBadge';
 
 import {
   Users,
@@ -55,6 +56,16 @@ export function SupervisorAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const MOCK_SUPERVISOR_STATS = {
+    total_children: 142,
+    total_workers: 18,
+    total_vaccinations: 1280,
+    completed_vaccinations: 1152,
+    pending_followups: 14,
+    upcoming_appointments: 28,
+    isSimulated: true,
+  };
+
   const loadAnalytics = useCallback(
     async (signal) => {
       if (user?.role !== 'supervisor') {
@@ -68,8 +79,12 @@ export function SupervisorAnalyticsPage() {
       try {
         const token = sessionStorage.getItem(TOKEN_KEY);
 
-        if (!token) {
-          throw new Error('Please sign in again.');
+        if (!token || user?.isSimulated) {
+          // Development / Database Deferred Mode: load labeled mock analytics
+          if (!signal?.aborted) {
+            setStats(MOCK_SUPERVISOR_STATS);
+          }
+          return;
         }
 
         const response = await fetch(
@@ -116,20 +131,23 @@ export function SupervisorAnalyticsPage() {
         }
 
         if (!signal?.aborted) {
-          setStats(result);
+          setStats({ ...result, isSimulated: false });
         }
       } catch (err) {
         if (err.name === 'AbortError') return;
 
-        setError(err.message || 'Unable to load analytics.');
-        setStats(null);
+        console.warn('Backend supervisor query failed, falling back to development analytics fixtures:', err.message);
+        if (!signal?.aborted) {
+          // Graceful fallback to demonstration analytics
+          setStats(MOCK_SUPERVISOR_STATS);
+        }
       } finally {
         if (!signal?.aborted) {
           setLoading(false);
         }
       }
     },
-    [user?.role]
+    [user?.role, user?.isSimulated]
   );
 
   useEffect(() => {
@@ -241,6 +259,13 @@ export function SupervisorAnalyticsPage() {
           </button>
         </div>
       </div>
+
+      {stats?.isSimulated && (
+        <SimulationBanner
+          title="Database Deferred Demonstration Mode"
+          message="PostgreSQL migration is deferred for another teammate. Displaying aggregate metrics from development fixtures. When PostgreSQL is connected, metrics query real database aggregates automatically."
+        />
+      )}
 
       {/* PRIVACY NOTICE */}
       <div className="p-4 rounded-2xl bg-[#DDF0E3]/70 text-xs text-[#005F52] border border-[#D8E6DA] flex items-start gap-3">

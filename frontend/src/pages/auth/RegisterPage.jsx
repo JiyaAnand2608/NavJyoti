@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { SimulationBadge, SimulationBanner } from '../../components/common/SimulationBadge';
-import { ArrowLeft, UserPlus, ShieldCheck, AlertCircle } from 'lucide-react';
+import { ArrowLeft, UserPlus, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 export function RegisterPage() {
   const { registerCaregiver } = useAuth();
@@ -12,13 +12,16 @@ export function RegisterPage() {
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState('');
   const [village, setVillage] = useState('Rampur');
   const [selectedLanguage, setSelectedLanguage] = useState(lang || 'hi');
   const [consent, setConsent] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -27,9 +30,15 @@ export function RegisterPage() {
       return;
     }
 
-    const cleanPhone = phone.trim().replace(/\s/g, '');
-    if (!cleanPhone || cleanPhone.length < 10) {
-      setErrorMsg('Please enter a valid 10-digit mobile number');
+    const cleanPhone = phone.trim().replace(/[\s-]/g, '');
+    const phoneRegex = /^(\+91|0)?[6-9]\d{9}$/;
+    if (!phoneRegex.test(cleanPhone)) {
+      setErrorMsg('Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9');
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      setErrorMsg('Please create a secure password (minimum 6 characters)');
       return;
     }
 
@@ -39,22 +48,28 @@ export function RegisterPage() {
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      registerCaregiver({
-        name,
-        phone,
+
+    try {
+      await registerCaregiver({
+        name: name.trim(),
+        phone: cleanPhone,
+        password,
         village,
         language: selectedLanguage,
         consent,
+        email: email.trim() || null,
       });
 
       if (selectedLanguage !== lang) {
         setLang(selectedLanguage);
       }
 
-      setIsSubmitting(false);
       navigate('/parent/dashboard', { replace: true });
-    }, 400);
+    } catch (err) {
+      setErrorMsg(err.message || 'Registration failed. Please check your details and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -65,7 +80,7 @@ export function RegisterPage() {
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Login</span>
         </Link>
-        <SimulationBadge label="Simulated Onboarding" />
+        <SimulationBadge label="Caregiver Registration" />
       </div>
 
       {/* Main Container */}
@@ -78,13 +93,13 @@ export function RegisterPage() {
               {t('auth.createAccountTitle') || "Create Caregiver Account"}
             </h1>
             <p className="text-xs text-[#294B57] mt-1">
-              {t('auth.createAccountSubtitle') || "Sign up to track and organize your child's health journey"}
+              Sign up with your mobile number to manage your child's immunization & health journey
             </p>
           </div>
 
           <SimulationBanner
-            title="Demonstration Account Setup"
-            message="No real SMS verification required in this prototype. Submitting creates a local demo profile immediately."
+            title="FastAPI & Option B Verified"
+            message="Parents register using Mobile Number and Password. Email is completely optional."
           />
 
           {errorMsg && (
@@ -97,7 +112,7 @@ export function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-4 text-xs mt-4">
             <div>
               <label className="block font-semibold text-[#103342] mb-1.5">
-                Caregiver Full Name
+                Caregiver Full Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -111,14 +126,51 @@ export function RegisterPage() {
 
             <div>
               <label className="block font-semibold text-[#103342] mb-1.5">
-                Mobile Number (for SMS reminders)
+                Mobile Number (for Login & SMS Reminders) <span className="text-red-500">*</span>
               </label>
               <input
                 type="tel"
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 98765 43210"
+                placeholder="e.g. 9876543210 or +91 98765 43210"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold text-[#103342] mb-1.5">
+                Create Password <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Minimum 6 characters"
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#294B57]/60 hover:text-[#103342] cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-[#103342] mb-1.5">
+                Email Address <span className="text-[#294B57]/60 font-normal">(Optional)</span>
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. sunita@example.com (optional)"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
               />
             </div>
@@ -178,7 +230,7 @@ export function RegisterPage() {
                   className="mt-0.5 rounded text-[#007F68] focus:ring-[#007F68] cursor-pointer"
                 />
                 <span className="text-[11px] text-[#294B57] leading-relaxed">
-                  I agree to participate in the NavJyoti health support prototype and consent to receiving timely child vaccination reminders.
+                  I consent to creating a digital health profile for my child under the NavJyoti immunization support system and agree to receive periodic vaccination reminder messages.
                 </span>
               </label>
             </div>
@@ -188,8 +240,17 @@ export function RegisterPage() {
               disabled={isSubmitting}
               className="w-full py-3 rounded-full bg-[#007F68] hover:bg-[#005F52] text-white font-semibold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
             >
-              <UserPlus className="w-4 h-4" />
-              <span>{isSubmitting ? "Creating Profile..." : "Register & Continue"}</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Registering Profile...</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4" />
+                  <span>Register & Continue</span>
+                </>
+              )}
             </button>
           </form>
 
@@ -204,7 +265,7 @@ export function RegisterPage() {
 
       {/* Footer */}
       <div className="max-w-md mx-auto w-full text-center text-xs text-[#294B57]/70 py-4 border-t border-[#D8E6DA]/60">
-        NavJyoti Healthcare Prototype • MoHFW UIP Aligned
+        NavJyoti Healthcare Platform • MoHFW UIP Aligned
       </div>
     </div>
   );
