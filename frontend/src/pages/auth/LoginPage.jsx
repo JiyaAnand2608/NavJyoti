@@ -86,7 +86,23 @@ export function LoginPage() {
     setPassword('');
     setOtp('');
     setOtpSent(false);
-    setUsePasswordMode(false);
+    setUsePasswordMode(true);
+  };
+
+  const handleFillDemoCreds = () => {
+    setErrorMsg('');
+    if (selectedRole === 'parent') {
+      setPhone('9876543210');
+      setPassword('NavJyoti@123');
+    } else if (selectedRole === 'worker') {
+      setEmail('worker.demo@navjyoti.test');
+      setPassword('NavJyoti@123');
+      setUsePasswordMode(true);
+    } else if (selectedRole === 'supervisor') {
+      setEmail('supervisor.demo@navjyoti.test');
+      setPassword('NavJyoti@123');
+      setUsePasswordMode(true);
+    }
   };
 
   // 1. Handle Parent Mobile + Password Login
@@ -200,11 +216,19 @@ export function LoginPage() {
     }
   };
 
-  // 5. 1-Click Instant Demo Login (for presentations & instant testing)
-  const handleQuickDemoLogin = (role) => {
-    const demoUser = loginWithDemo(role);
-    const targetPath = dashboardPaths[demoUser.role] || '/parent/dashboard';
-    navigate(targetPath, { replace: true });
+  // 5. 1-Click Instant Demo Login (Authenticates against PostgreSQL with seamless offline fallback)
+  const handleQuickDemoLogin = async (role) => {
+    setIsSubmitting(true);
+    setErrorMsg('');
+    try {
+      const demoUser = await loginWithDemo(role);
+      const targetPath = dashboardPaths[demoUser.role] || '/parent/dashboard';
+      navigate(targetPath, { replace: true });
+    } catch (error) {
+      setErrorMsg(error.message || 'Demo login failed. Please check connection.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -385,6 +409,17 @@ export function LoginPage() {
                 </div>
               </div>
 
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  type="button"
+                  onClick={handleFillDemoCreds}
+                  className="text-[11px] text-[#007F68] font-bold hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Fill Demo Account (9876543210 / NavJyoti@123)</span>
+                </button>
+              </div>
+
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -408,6 +443,38 @@ export function LoginPage() {
           {/* --------- WORKER / SUPERVISOR AUTHENTICATION FORM --------- */}
           {selectedRole !== 'parent' && (
             <div>
+              {/* Mode Selector: Email + Password vs Email OTP */}
+              <div className="flex rounded-xl bg-[#F0EBE1] p-1 mb-4 border border-[#D8E6DA]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsePasswordMode(true);
+                    setErrorMsg('');
+                  }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    usePasswordMode
+                      ? 'bg-white text-[#103342] shadow-sm font-bold'
+                      : 'text-[#294B57] hover:text-[#103342]'
+                  }`}
+                >
+                  Email & Password Login
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsePasswordMode(false);
+                    setErrorMsg('');
+                  }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    !usePasswordMode
+                      ? 'bg-white text-[#103342] shadow-sm font-bold'
+                      : 'text-[#294B57] hover:text-[#103342]'
+                  }`}
+                >
+                  Email OTP Login
+                </button>
+              </div>
+
               {!usePasswordMode ? (
                 // OTP Workflow
                 <div className="space-y-4 text-xs">
@@ -428,8 +495,8 @@ export function LoginPage() {
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder={
                           selectedRole === 'supervisor'
-                            ? 'moic@navjyoti.gov.in'
-                            : 'rekha.anm@navjyoti.gov.in'
+                            ? 'supervisor.demo@navjyoti.test'
+                            : 'worker.demo@navjyoti.test'
                         }
                         className="w-full px-3.5 py-2.5 pl-9 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68] disabled:bg-gray-100"
                       />
@@ -514,30 +581,16 @@ export function LoginPage() {
                       </button>
                     </form>
                   )}
-
-                  {/* Mode switch to password */}
-                  <div className="text-center pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUsePasswordMode(true);
-                        setErrorMsg('');
-                      }}
-                      className="text-[11px] text-[#294B57]/70 hover:text-[#007F68] font-medium hover:underline cursor-pointer"
-                    >
-                      Or sign in with Password instead
-                    </button>
-                  </div>
                 </div>
               ) : (
-                // Password Fallback Mode
+                // Email + Password Mode
                 <form onSubmit={handleStaffPasswordLogin} className="space-y-4 text-xs">
                   <div>
                     <label
                       htmlFor="staff-pwd-email"
                       className="block font-semibold text-[#103342] mb-1.5"
                     >
-                      Official Staff Email
+                      {selectedRole === 'worker' ? 'Health Worker Email' : 'Supervisor / MOIC Email'}
                     </label>
                     <div className="relative">
                       <input
@@ -546,7 +599,11 @@ export function LoginPage() {
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="email@navjyoti.gov.in"
+                        placeholder={
+                          selectedRole === 'supervisor'
+                            ? 'supervisor.demo@navjyoti.test'
+                            : 'worker.demo@navjyoti.test'
+                        }
                         className="w-full px-3.5 py-2.5 pl-9 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
                       />
                       <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#294B57]/50" />
@@ -558,7 +615,7 @@ export function LoginPage() {
                       htmlFor="staff-password"
                       className="block font-semibold text-[#103342] mb-1.5"
                     >
-                      Staff Password
+                      Password
                     </label>
                     <div className="relative">
                       <input
@@ -567,7 +624,7 @@ export function LoginPage() {
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter password"
+                        placeholder="NavJyoti@123"
                         className="w-full px-3.5 py-2.5 pl-9 pr-10 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
                       />
                       <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#294B57]/50" />
@@ -582,6 +639,23 @@ export function LoginPage() {
                     </div>
                   </div>
 
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={handleFillDemoCreds}
+                      className="text-[11px] text-[#007F68] font-bold hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>
+                        Fill Demo (
+                        {selectedRole === 'supervisor'
+                          ? 'supervisor.demo@navjyoti.test'
+                          : 'worker.demo@navjyoti.test'}
+                        )
+                      </span>
+                    </button>
+                  </div>
+
                   <button
                     type="submit"
                     disabled={isSubmitting}
@@ -594,24 +668,15 @@ export function LoginPage() {
                       </>
                     ) : (
                       <>
-                        <span>Sign In with Password</span>
+                        <span>
+                          {selectedRole === 'worker'
+                            ? 'Sign In as Health Worker'
+                            : 'Sign In as Supervisor'}
+                        </span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
                   </button>
-
-                  <div className="text-center pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUsePasswordMode(false);
-                        setErrorMsg('');
-                      }}
-                      className="text-[11px] text-[#294B57]/70 hover:text-[#007F68] font-medium hover:underline cursor-pointer"
-                    >
-                      Switch back to Email OTP verification
-                    </button>
-                  </div>
                 </form>
               )}
             </div>

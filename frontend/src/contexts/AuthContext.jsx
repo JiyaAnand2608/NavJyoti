@@ -246,26 +246,42 @@ export function AuthProvider({ children }) {
     }
   }, [loginParent]);
 
-  // 6. 1-Click Instant Demo Login (for presentations & database-deferred evaluation)
-  const loginWithDemo = useCallback((roleKey = 'parent') => {
-    const accounts = getAccounts();
+  // 6. 1-Click Instant Demo Login (Authenticates against live PostgreSQL with seamless offline fallback)
+  const loginWithDemo = useCallback(async (roleKey = 'parent') => {
     const targetRole = roleKey === 'supervisor' ? 'supervisor' : roleKey === 'worker' ? 'worker' : 'parent';
-    const demoAccount = accounts.find((a) => a.role === targetRole) || DEFAULT_ACCOUNTS.find((a) => a.role === targetRole) || {
-      id: `usr_${targetRole}_demo`,
-      role: targetRole,
-      name: targetRole === 'parent' ? "Sunita Sharma" : targetRole === 'supervisor' ? "Dr. Sharma (MOIC)" : "Rekha Devi (ANM)",
-      email: `${targetRole}@navjyoti.gov.in`,
-      phone: "+91 98765 43210",
-      village: "Rampur",
-      isSimulated: true,
+    const demoCredentials = {
+      parent: { identifier: '9876543210', password: 'NavJyoti@123' },
+      worker: { identifier: 'worker.demo@navjyoti.test', password: 'NavJyoti@123' },
+      supervisor: { identifier: 'supervisor.demo@navjyoti.test', password: 'NavJyoti@123' },
     };
 
-    const sessionObj = { ...demoAccount, isSimulated: true };
-    sessionStorage.removeItem(TOKEN_KEY);
-    sessionStorage.setItem(DEMO_USER_KEY, JSON.stringify(sessionObj));
-    setUser(sessionObj);
-    return sessionObj;
-  }, []);
+    const creds = demoCredentials[targetRole];
+    try {
+      if (targetRole === 'parent') {
+        return await loginParent(creds.identifier, creds.password);
+      } else {
+        return await loginWithPassword(creds.identifier, creds.password);
+      }
+    } catch (e) {
+      console.warn('PostgreSQL demo login deferred to client fixture:', e.message);
+      const accounts = getAccounts();
+      const demoAccount = accounts.find((a) => a.role === targetRole) || DEFAULT_ACCOUNTS.find((a) => a.role === targetRole) || {
+        id: `usr_${targetRole}_demo`,
+        role: targetRole,
+        name: targetRole === 'parent' ? "Sunita Sharma" : targetRole === 'supervisor' ? "Dr. Alok Verma" : "Rekha Devi",
+        email: targetRole === 'parent' ? "parent.demo@navjyoti.test" : targetRole === 'supervisor' ? "supervisor.demo@navjyoti.test" : "worker.demo@navjyoti.test",
+        phone: "+91 98765 43210",
+        village: targetRole === 'supervisor' ? "Bilaspur Sadar" : "Rampur",
+        isSimulated: true,
+      };
+
+      const sessionObj = { ...demoAccount, isSimulated: true };
+      sessionStorage.removeItem(TOKEN_KEY);
+      sessionStorage.setItem(DEMO_USER_KEY, JSON.stringify(sessionObj));
+      setUser(sessionObj);
+      return sessionObj;
+    }
+  }, [loginParent, loginWithPassword]);
 
   const updateProfile = useCallback(async (patchData) => {
     if (!user) return null;

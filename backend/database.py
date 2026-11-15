@@ -40,13 +40,31 @@ def get_database_url() -> str:
             database=db_name,
         ))
 
+    # Check if a local PostgreSQL cluster is already running in pgdata
+    pgdata_dir = BASE_DIR.parent / "pgdata"
+    postmaster_file = pgdata_dir / "postmaster.pid"
+    if postmaster_file.exists():
+        try:
+            lines = postmaster_file.read_text().splitlines()
+            if len(lines) >= 4:
+                active_port = int(lines[3].strip())
+                import socket
+                s = socket.socket()
+                s.settimeout(0.5)
+                if s.connect_ex(("127.0.0.1", active_port)) == 0:
+                    s.close()
+                    return f"postgresql+psycopg://postgres:@127.0.0.1:{active_port}/navjyoti"
+                s.close()
+        except Exception:
+            pass
+
     # Native self-contained PostgreSQL instance (pgserver)
     try:
         import pgserver
         pgdata_dir = BASE_DIR.parent / "pgdata"
         if not pgdata_dir.exists():
             pgdata_dir.mkdir(parents=True, exist_ok=True)
-        srv = pgserver.get_server(pgdata_dir)
+        srv = pgserver.get_server(pgdata_dir, cleanup_mode=None)
         # Ensure 'navjyoti' database exists without noisy stderr
         try:
             check_sql = "SELECT 1 FROM pg_database WHERE datname = 'navjyoti';"

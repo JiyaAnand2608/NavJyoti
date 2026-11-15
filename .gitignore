@@ -26,3 +26,5 @@ backend/create_worker.py
 # PostgreSQL Local Cluster
 pgdata/
 *.dump
+backup_*.sql
+*.sql.bak
