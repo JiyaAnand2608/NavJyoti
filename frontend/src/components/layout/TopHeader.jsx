@@ -73,13 +73,17 @@ export function TopHeader({ onOpenMobileNav }) {
     ? '/parent/profile'
     : isWorker
       ? '/worker/profile'
-      : null;
+      : isSupervisor
+        ? '/supervisor/profile'
+        : null;
 
   const notificationPath = isParent
     ? '/parent/reminders'
     : isWorker
       ? '/worker/appointments'
-      : null;
+      : isSupervisor
+        ? '/supervisor/alerts'
+        : null;
 
   const userInitial =
     user?.name?.trim()?.charAt(0)?.toUpperCase() ||
@@ -114,7 +118,29 @@ export function TopHeader({ onOpenMobileNav }) {
         </button>
 
         {/* Role context details */}
-        {!isWorker ? (
+        {isSupervisor ? (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#DDF0E3] border border-[#007F68]/30 text-xs sm:text-[13px]">
+            <span className="text-[10px] uppercase font-bold text-white bg-[#007F68] px-2 py-0.5 rounded-md">Authority</span>
+            <ShieldCheck className="w-4 h-4 text-[#007F68]" />
+            <span className="font-bold text-[#103342] truncate max-w-[140px] sm:max-w-xs">
+              {typeof user?.jurisdiction === 'string' ? user.jurisdiction : (user?.jurisdiction?.district || user?.jurisdiction?.subCentre || 'Assigned Jurisdiction')}
+            </span>
+          </div>
+        ) : isWorker ? (
+          /* Health Worker Sub-centre badge */
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-xs sm:text-[13px]">
+              <span className="text-[10.5px] uppercase font-bold text-[#007F68] bg-[#DDF0E3] px-2 py-0.5 rounded-md">Worker</span>
+              <Building2 className="w-4 h-4 text-[#007F68]" />
+              <span className="font-bold text-[#103342]">
+                {typeof user?.jurisdiction === 'object' ? user?.jurisdiction?.subCentre : (user?.jurisdiction || "Rampur Sub-Centre")}
+              </span>
+              <span className="text-[#A8D5B5]">|</span>
+              <span className="text-[#294B57] font-medium">{typeof user?.jurisdiction === 'object' ? (user?.jurisdiction?.phc || "Bilaspur PHC") : "Sub-Centre"}</span>
+            </div>
+          </div>
+        ) : (
+          /* Parent child selector */
           childrenList && childrenList.length > 0 ? (
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#DDF0E3] border border-[#D8E6DA] text-xs sm:text-[13px]">
@@ -145,29 +171,6 @@ export function TopHeader({ onOpenMobileNav }) {
           ) : (
             <span className="text-[13px] text-[#294B57] font-medium">No child linked yet</span>
           )
-        ) : (
-          /* Health Worker Sub-centre badge */
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-xs sm:text-[13px]">
-              <span className="text-[10.5px] uppercase font-bold text-[#007F68] bg-[#DDF0E3] px-2 py-0.5 rounded-md">Worker</span>
-              <Building2 className="w-4 h-4 text-[#007F68]" />
-              <span className="font-bold text-[#103342]">
-                {user?.jurisdiction?.subCentre || "Rampur Sub-Centre"}
-              </span>
-              <span className="text-[#A8D5B5]">|</span>
-              <span className="text-[#294B57] font-medium">{user?.jurisdiction?.phc || "Bilaspur PHC"}</span>
-            </div>
-          </div>
-        )}
-
-        {/* SUPERVISOR */}
-        {isSupervisor && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-xs">
-            <ShieldCheck className="w-4 h-4 text-[#007F68]" />
-            <span className="font-bold text-[#103342]">
-              Supervisor Portal
-            </span>
-          </div>
         )}
       </div>
 
@@ -258,6 +261,18 @@ export function TopHeader({ onOpenMobileNav }) {
             aria-label="View appointment requests"
           >
             <CalendarCheck className="w-4 h-4" />
+          </Link>
+        )}
+
+        {/* SUPERVISOR ALERTS */}
+        {isSupervisor && notificationPath && (
+          <Link
+            to={notificationPath}
+            className="p-2 rounded-xl text-[#294B57] hover:bg-[#F0EBE1] border border-[#D8E6DA] bg-white relative"
+            title="View jurisdiction alerts"
+            aria-label="View jurisdiction alerts"
+          >
+            <Bell className="w-4 h-4 text-[#007F68]" />
           </Link>
         )}
 

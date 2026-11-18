@@ -21,6 +21,7 @@ import {
   Baby,
   ShieldCheck,
   Users,
+  History,
 } from 'lucide-react';
 
 import clsx from 'clsx';
@@ -122,12 +123,51 @@ const workerSecondaryNav = [
   },
 ];
 
-// Only include supervisor routes already verified in the app.
 const supervisorPrimaryNav = [
   {
-    name: 'Health Analytics',
-    path: '/supervisor/analytics',
+    name: 'Dashboard',
+    path: '/supervisor/dashboard',
+    icon: LayoutDashboard,
+  },
+  {
+    name: 'Healthcare Workers',
+    path: '/supervisor/workers',
+    icon: Users,
+  },
+  {
+    name: 'Child Registry',
+    path: '/supervisor/children',
+    icon: ClipboardList,
+  },
+  {
+    name: 'Vaccination Monitoring',
+    path: '/supervisor/vaccinations',
+    icon: Syringe,
+  },
+  {
+    name: 'Follow-Ups',
+    path: '/supervisor/follow-ups',
+    icon: ShieldAlert,
+  },
+  {
+    name: 'Activity Logs',
+    path: '/supervisor/audit-logs',
+    icon: History,
+  },
+  {
+    name: 'Reports & Analytics',
+    path: '/supervisor/reports',
     icon: BarChart3,
+  },
+  {
+    name: 'Alerts',
+    path: '/supervisor/alerts',
+    icon: Bell,
+  },
+  {
+    name: 'Profile / Settings',
+    path: '/supervisor/profile',
+    icon: Settings,
   },
 ];
 
@@ -151,8 +191,8 @@ const roleConfigurations = {
   },
 
   supervisor: {
-    portalName: 'Supervisor Portal',
-    roleLabel: 'Health Supervisor',
+    portalName: 'Authority Portal',
+    roleLabel: 'Healthcare Supervisor',
     primaryNav: supervisorPrimaryNav,
     secondaryNav: supervisorSecondaryNav,
     icon: ShieldCheck,
@@ -194,6 +234,15 @@ export function Sidebar({ collapsed = false, setCollapsed }) {
   // Use the authenticated account role.
   // Do not allow demo role switching from the sidebar.
   const currentRole = user?.role || role;
+  const isWorker = currentRole === 'worker';
+  const isSupervisor = currentRole === 'supervisor';
+  const isParent = currentRole === 'parent';
+
+  const homePath = isSupervisor
+    ? '/supervisor/dashboard'
+    : isWorker
+      ? '/worker/dashboard'
+      : '/parent/dashboard';
 
   const configuration = roleConfigurations[currentRole];
 
@@ -208,6 +257,11 @@ export function Sidebar({ collapsed = false, setCollapsed }) {
 
   const RoleIcon =
     configuration?.icon || ShieldCheck;
+
+  const initials =
+    user?.name?.trim()?.charAt(0)?.toUpperCase() ||
+    user?.email?.trim()?.charAt(0)?.toUpperCase() ||
+    'N';
 
   const handleLogout = () => {
     logout();
@@ -227,7 +281,7 @@ export function Sidebar({ collapsed = false, setCollapsed }) {
       {/* BRAND HEADER */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between">
         <Link
-          to={isWorker ? "/worker/dashboard" : "/parent/dashboard"}
+          to={homePath}
           className="flex items-center gap-3 overflow-hidden"
           title="Return to Portal Dashboard"
         >
@@ -247,7 +301,7 @@ export function Sidebar({ collapsed = false, setCollapsed }) {
                 NavJyoti
               </span>
               <span className="block text-[11px] uppercase tracking-wider text-[#A8D5B5] font-semibold">
-                {isWorker ? "Health Worker Portal" : "Caregiver Portal"}
+                {portalName}
               </span>
 
             </div>
@@ -261,7 +315,7 @@ export function Sidebar({ collapsed = false, setCollapsed }) {
           <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
             <span className="text-slate-300 text-xs font-medium">Role:</span>
             <span className="font-semibold text-xs text-white">
-              {isWorker ? "Worker" : "Parent"}
+              {roleLabel}
             </span>
           </div>
         </div>
@@ -335,10 +389,10 @@ export function Sidebar({ collapsed = false, setCollapsed }) {
 
               <div className="truncate flex-1">
                 <p className="text-[13.5px] font-bold text-white truncate">
-                  {user?.name || (isWorker ? 'Rekha Devi (ANM)' : 'Sunita Sharma')}
+                  {user?.name || (isSupervisor ? 'Dr. Alok Verma' : isWorker ? 'Rekha Devi (ANM)' : 'Sunita Sharma')}
                 </p>
                 <p className="text-[11.5px] text-slate-300 font-normal truncate">
-                  {isWorker ? 'Bilaspur PHC • UP' : 'Caregiver • Rampur'}
+                  {isSupervisor ? (user?.jurisdiction || 'District HQ • UP') : isWorker ? 'Bilaspur PHC • UP' : 'Caregiver • Rampur'}
                 </p>
 
               </div>

@@ -40,6 +40,17 @@ import { QrHandoffPage } from '../pages/worker/QrHandoffPage';
 import { WorkerProfilePage } from '../pages/worker/WorkerProfilePage';
 
 // Supervisor pages
+import { AuthorityDashboardPage } from '../pages/supervisor/AuthorityDashboardPage';
+import { AuthorityWorkersPage } from '../pages/supervisor/AuthorityWorkersPage';
+import { AuthorityWorkerDetailPage } from '../pages/supervisor/AuthorityWorkerDetailPage';
+import { AuthorityChildRegistryPage } from '../pages/supervisor/AuthorityChildRegistryPage';
+import { AuthorityChildDetailPage } from '../pages/supervisor/AuthorityChildDetailPage';
+import { AuthorityVaccinationPage } from '../pages/supervisor/AuthorityVaccinationPage';
+import { AuthorityFollowUpsPage } from '../pages/supervisor/AuthorityFollowUpsPage';
+import { AuthorityAuditLogsPage } from '../pages/supervisor/AuthorityAuditLogsPage';
+import { AuthorityReportsPage } from '../pages/supervisor/AuthorityReportsPage';
+import { AuthorityAlertsPage } from '../pages/supervisor/AuthorityAlertsPage';
+import { AuthorityProfilePage } from '../pages/supervisor/AuthorityProfilePage';
 import { SupervisorAnalyticsPage } from '../pages/supervisor/SupervisorAnalyticsPage';
 
 export function AppRoutes() {
@@ -80,7 +91,7 @@ export function AppRoutes() {
             HEALTH WORKER ROUTES
             Only authenticated workers can access.
         ========================================== */}
-        <Route element={<ProtectedRoute allowedRoles={['worker', 'supervisor']} />}>
+        <Route element={<ProtectedRoute allowedRoles={['worker']} />}>
           <Route path="/worker" element={<DashboardLayout />}>
             <Route index element={<Navigate to="/worker/dashboard" replace />} />
             <Route path="dashboard" element={<WorkerDashboardOverview />} />
@@ -96,13 +107,24 @@ export function AppRoutes() {
         </Route>
 
         {/* ==========================================
-            SUPERVISOR ROUTES
+            AUTHORITY / SUPERVISOR ROUTES
             Only authenticated supervisors can access.
         ========================================== */}
-        <Route element={<ProtectedRoute allowedRoles={['supervisor', 'worker']} />}>
+        <Route element={<ProtectedRoute allowedRoles={['supervisor']} />}>
           <Route path="/supervisor" element={<DashboardLayout />}>
-            <Route index element={<Navigate to="/supervisor/analytics" replace />} />
+            <Route index element={<Navigate to="/supervisor/dashboard" replace />} />
+            <Route path="dashboard" element={<AuthorityDashboardPage />} />
+            <Route path="workers" element={<AuthorityWorkersPage />} />
+            <Route path="workers/:id" element={<AuthorityWorkerDetailPage />} />
+            <Route path="children" element={<AuthorityChildRegistryPage />} />
+            <Route path="children/:id" element={<AuthorityChildDetailPage />} />
+            <Route path="vaccinations" element={<AuthorityVaccinationPage />} />
+            <Route path="follow-ups" element={<AuthorityFollowUpsPage />} />
+            <Route path="audit-logs" element={<AuthorityAuditLogsPage />} />
+            <Route path="reports" element={<AuthorityReportsPage />} />
             <Route path="analytics" element={<SupervisorAnalyticsPage />} />
+            <Route path="alerts" element={<AuthorityAlertsPage />} />
+            <Route path="profile" element={<AuthorityProfilePage />} />
           </Route>
         </Route>
 

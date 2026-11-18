@@ -1,3 +1,6 @@
+import csv
+import io
+import json
 import hashlib
 import os
 import secrets
@@ -10,6 +13,7 @@ from fastapi import (
     HTTPException,
     status
 )
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import (
     HTTPBearer,
@@ -40,7 +44,8 @@ from models import (
     OTPRecord,
     Notification,
     Communication,
-    QRTokenRecord
+    QRTokenRecord,
+    AuditLog
 )
 import otp_service
 from schemas import (
@@ -75,7 +80,18 @@ from schemas import (
     CommunicationCreate,
     CommunicationResponse,
     QRPassResponse,
-    QRPublicResolverResponse
+    QRPublicResolverResponse,
+    AuditLogResponse,
+    SupervisorDashboardStats,
+    SupervisorWorkerSummary,
+    SupervisorWorkerDetail,
+    SupervisorChildOverview,
+    SupervisorChildDetail,
+    SupervisorVaccinationMonitoring,
+    SupervisorFollowUpOverview,
+    SupervisorReportSummary,
+    SupervisorAlert,
+    SupervisorProfileResponse
 )
 from phone_utils import normalize_indian_phone, is_valid_indian_phone
 
@@ -155,6 +171,87 @@ def require_role(*allowed_roles: str):
             )
         return current_user
     return role_checker
+
+
+# ==============================================================================
+# AUDIT LOGGING & JURISDICTION HELPERS
+# ==============================================================================
+
+def record_audit_event(
+    db: Session,
+    user_id: int,
+    action_type: str,
+    record_type: str,
+    record_id: Optional[int] = None,
+    child_id: Optional[int] = None,
+    fields_changed: Optional[str] = None,
+    previous_values: Optional[dict] = None,
+    new_values: Optional[dict] = None
+) -> AuditLog:
+    """
+    Atomically records a patient record mutation event to the audit trail.
+    Committed in the same database transaction as the clinical modification.
+    Strictly filters out any credentials or secrets.
+    """
+    forbidden_keys = {"password", "password_hash", "token", "otp", "secret"}
+    safe_prev = {k: v for k, v in previous_values.items() if k not in forbidden_keys} if previous_values else None
+    safe_new = {k: v for k, v in new_values.items() if k not in forbidden_keys} if new_values else None
+
+    audit_entry = AuditLog(
+        user_id=user_id,
+        child_id=child_id,
+        action_type=action_type,
+        record_type=record_type,
+        record_id=record_id,
+        fields_changed=fields_changed,
+        previous_values=json.dumps(safe_prev, default=str) if safe_prev else None,
+        new_values=json.dumps(safe_new, default=str) if safe_new else None,
+        timestamp=datetime.now(timezone.utc)
+    )
+    db.add(audit_entry)
+    return audit_entry
+
+
+def get_supervisor_jurisdiction(supervisor: User) -> str:
+    """
+    Retrieves the assigned healthcare jurisdiction for an authenticated supervisor.
+    If no jurisdiction or village is assigned, access is safely denied.
+    """
+    jurisdiction = (supervisor.jurisdiction or supervisor.village or "").strip()
+    if not jurisdiction:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No healthcare jurisdiction is assigned to this supervisor account. Access denied."
+        )
+    return jurisdiction
+
+
+def get_jurisdiction_worker_ids(db: Session, jurisdiction: str) -> List[int]:
+    """
+    Returns the user IDs of all healthcare workers within the assigned jurisdiction.
+    """
+    j_lower = jurisdiction.lower()
+    if j_lower in ("district hq", "all", "all-jurisdictions", "district"):
+        return [w.id for w in db.query(User.id).filter(User.role == "worker").all()]
+    workers = db.query(User.id).filter(
+        User.role == "worker",
+        (func.lower(User.jurisdiction) == j_lower) | (func.lower(User.village) == j_lower)
+    ).all()
+    return [w.id for w in workers]
+
+
+def get_jurisdiction_child_ids(db: Session, jurisdiction: str, worker_ids: List[int]) -> List[int]:
+    """
+    Returns the child IDs of all children belonging to the assigned jurisdiction or assigned workers.
+    """
+    j_lower = jurisdiction.lower()
+    if j_lower in ("district hq", "all", "all-jurisdictions", "district"):
+        return [c.id for c in db.query(Child.id).all()]
+    children = db.query(Child.id).filter(
+        (func.lower(Child.village) == j_lower) | (Child.assigned_worker_id.in_(worker_ids) if worker_ids else False)
+    ).all()
+    return [c.id for c in children]
+
 
 
 # ==============================================================================
@@ -382,6 +479,26 @@ def create_child(
     )
 
     db.add(child)
+    db.flush()
+
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="CREATE_CHILD",
+        record_type="child",
+        record_id=child.id,
+        child_id=child.id,
+        fields_changed="name,date_of_birth,gender,village,blood_group,birth_weight_kg",
+        new_values={
+            "name": child.name,
+            "date_of_birth": str(child.date_of_birth),
+            "gender": child.gender,
+            "village": child.village,
+            "blood_group": child.blood_group,
+            "birth_weight_kg": child.birth_weight_kg
+        }
+    )
+
     db.commit()
     db.refresh(child)
     return child
@@ -400,7 +517,10 @@ def get_accessible_children(
     elif current_user.role == "worker":
         return db.query(Child).filter(Child.assigned_worker_id == current_user.id).all()
     elif current_user.role == "supervisor":
-        return db.query(Child).all()
+        jurisdiction = get_supervisor_jurisdiction(current_user)
+        worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+        child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+        return db.query(Child).filter(Child.id.in_(child_ids) if child_ids else False).all()
     return []
 
 
@@ -427,8 +547,16 @@ def get_child_by_id(
             detail="You are not authorized to view this child record."
         )
     if current_user.role == "worker" and child.assigned_worker_id != current_user.id:
-        # Check if worker shares the child's village or jurisdiction
-        pass  # Worker authorized for sub-centre oversight
+        pass
+    if current_user.role == "supervisor":
+        jurisdiction = get_supervisor_jurisdiction(current_user)
+        worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+        child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+        if child.id not in child_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Child record outside assigned jurisdiction."
+            )
 
     return child
 
@@ -451,18 +579,36 @@ def update_child(
         )
 
     # Authorization
+    if current_user.role == "supervisor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Supervisors are restricted to oversight and cannot directly modify clinical records."
+        )
     if current_user.role == "parent" and child.parent_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
-    if current_user.role == "worker" and child.assigned_worker_id != current_user.id:
-        # Allow worker assigned or supervisor
-        if current_user.role != "supervisor":
-            pass
 
     update_fields = data.model_dump(exclude_unset=True)
+    prev_values = {
+        field: str(getattr(child, field, None))
+        for field in update_fields.keys()
+    }
+
     for field, val in update_fields.items():
         if field == "date_of_birth" and val and val > date.today():
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="DOB cannot be in future.")
         setattr(child, field, val)
+
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="UPDATE_CHILD",
+        record_type="child",
+        record_id=child.id,
+        child_id=child.id,
+        fields_changed=", ".join(update_fields.keys()),
+        previous_values=prev_values,
+        new_values=update_fields
+    )
 
     db.commit()
     db.refresh(child)
@@ -474,21 +620,10 @@ def update_child(
     response_model=List[ChildResponse]
 )
 def get_worker_assigned_children(
-    current_user: User = Depends(require_role("worker", "supervisor")),
+    current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
     return db.query(Child).filter(Child.assigned_worker_id == current_user.id).all()
-
-
-@app.get(
-    "/supervisor/children",
-    response_model=List[ChildResponse]
-)
-def get_supervisor_all_children(
-    current_user: User = Depends(require_role("supervisor")),
-    db: Session = Depends(get_db)
-):
-    return db.query(Child).all()
 
 
 # ==============================================================================
@@ -571,6 +706,19 @@ def schedule_vaccination(
         completed=False
     )
     db.add(vaccination)
+    db.flush()
+
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="SCHEDULE_VACCINATION",
+        record_type="vaccination",
+        record_id=vaccination.id,
+        child_id=child.id,
+        fields_changed="vaccine_name,due_date",
+        new_values={"vaccine_name": vaccination.vaccine_name, "due_date": str(vaccination.due_date)}
+    )
+
     db.commit()
     db.refresh(vaccination)
     return vaccination
@@ -583,7 +731,7 @@ def schedule_vaccination(
 def complete_vaccination(
     vaccination_id: int,
     data: VaccinationComplete,
-    current_user: User = Depends(require_role("worker", "supervisor")),
+    current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
     vaccination = db.query(Vaccination).filter(Vaccination.id == vaccination_id).first()
@@ -596,6 +744,11 @@ def complete_vaccination(
     if data.administered_date > date.today():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Administration date cannot be in the future.")
 
+    prev_values = {
+        "completed": False,
+        "administered_date": None
+    }
+
     vaccination.administered_date = data.administered_date
     vaccination.completed = True
     vaccination.batch_number = data.batch_number
@@ -603,6 +756,24 @@ def complete_vaccination(
     vaccination.worker_name = data.worker_name or current_user.name
     vaccination.site = data.site
     vaccination.notes = data.notes
+
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="COMPLETE_VACCINATION",
+        record_type="vaccination",
+        record_id=vaccination.id,
+        child_id=vaccination.child_id,
+        fields_changed="completed,administered_date,batch_number,facility,worker_name,site,notes",
+        previous_values=prev_values,
+        new_values={
+            "completed": True,
+            "administered_date": str(vaccination.administered_date),
+            "batch_number": vaccination.batch_number,
+            "facility": vaccination.facility,
+            "worker_name": vaccination.worker_name
+        }
+    )
 
     db.commit()
     db.refresh(vaccination)
@@ -617,7 +788,7 @@ def complete_vaccination(
 def record_administered_dose(
     child_id: int,
     data: VaccinationAdminister,
-    current_user: User = Depends(require_role("worker", "supervisor")),
+    current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
     child = db.query(Child).filter(Child.id == child_id).first()
@@ -670,6 +841,24 @@ def record_administered_dose(
             notes=data.notes
         )
         db.add(vaccination)
+
+    db.flush()
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="ADMINISTER_VACCINE",
+        record_type="vaccination",
+        record_id=vaccination.id,
+        child_id=child.id,
+        fields_changed="vaccine_name,administered_date,completed,batch_number,facility,worker_name",
+        new_values={
+            "vaccine_name": vaccination.vaccine_name,
+            "administered_date": str(vaccination.administered_date),
+            "batch_number": vaccination.batch_number,
+            "facility": vaccination.facility,
+            "worker_name": vaccination.worker_name
+        }
+    )
 
     db.commit()
     db.refresh(vaccination)
@@ -763,7 +952,7 @@ def get_growth_records(
 def record_growth(
     child_id: int,
     data: GrowthCreate,
-    current_user: User = Depends(require_role("worker", "supervisor")),
+    current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
     child = db.query(Child).filter(Child.id == child_id).first()
@@ -781,6 +970,23 @@ def record_growth(
         height_cm=data.height_cm
     )
     db.add(record)
+    db.flush()
+
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="RECORD_GROWTH",
+        record_type="growth",
+        record_id=record.id,
+        child_id=child.id,
+        fields_changed="weight_kg,height_cm,measurement_date",
+        new_values={
+            "weight_kg": record.weight_kg,
+            "height_cm": record.height_cm,
+            "measurement_date": str(record.measurement_date)
+        }
+    )
+
     db.commit()
     db.refresh(record)
     return record
@@ -819,6 +1025,23 @@ def request_appointment(
         status="requested"
     )
     db.add(appointment)
+    db.flush()
+
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="CREATE_APPOINTMENT",
+        record_type="appointment",
+        record_id=appointment.id,
+        child_id=child.id,
+        fields_changed="appointment_date,reason,status",
+        new_values={
+            "appointment_date": str(appointment.appointment_date),
+            "reason": appointment.reason,
+            "status": appointment.status
+        }
+    )
+
     db.commit()
     db.refresh(appointment)
     return appointment
@@ -873,7 +1096,7 @@ def get_upcoming_appointments(
 def update_appointment_status(
     appointment_id: int,
     data: AppointmentUpdate,
-    current_user: User = Depends(require_role("worker", "supervisor")),
+    current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
     apt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
@@ -883,12 +1106,26 @@ def update_appointment_status(
     if apt.status in ("completed", "cancelled"):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Appointment is already finalized.")
 
+    prev_status = apt.status
     if data.status == "rescheduled":
         if not data.appointment_date or data.appointment_date < date.today():
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Valid future date required for rescheduling.")
         apt.appointment_date = data.appointment_date
 
     apt.status = data.status
+
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="UPDATE_APPOINTMENT",
+        record_type="appointment",
+        record_id=apt.id,
+        child_id=apt.child_id,
+        fields_changed="status,appointment_date",
+        previous_values={"status": prev_status},
+        new_values={"status": apt.status, "appointment_date": str(apt.appointment_date)}
+    )
+
     db.commit()
     db.refresh(apt)
     return apt
@@ -915,7 +1152,21 @@ def cancel_appointment(
     if apt.status in ("completed", "cancelled"):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Appointment is already completed or cancelled.")
 
+    prev_status = apt.status
     apt.status = "cancelled"
+
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="CANCEL_APPOINTMENT",
+        record_type="appointment",
+        record_id=apt.id,
+        child_id=apt.child_id,
+        fields_changed="status",
+        previous_values={"status": prev_status},
+        new_values={"status": "cancelled"}
+    )
+
     db.commit()
     db.refresh(apt)
     return apt
@@ -929,7 +1180,7 @@ def cancel_appointment(
 def create_follow_up(
     child_id: int,
     data: FollowUpCreate,
-    current_user: User = Depends(require_role("worker", "supervisor")),
+    current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
     child = db.query(Child).filter(Child.id == child_id).first()
@@ -947,6 +1198,23 @@ def create_follow_up(
         status="pending"
     )
     db.add(follow_up)
+    db.flush()
+
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="CREATE_FOLLOWUP",
+        record_type="follow_up",
+        record_id=follow_up.id,
+        child_id=child.id,
+        fields_changed="due_date,reason,status",
+        new_values={
+            "due_date": str(follow_up.due_date),
+            "reason": follow_up.reason,
+            "status": follow_up.status
+        }
+    )
+
     db.commit()
     db.refresh(follow_up)
     return follow_up
@@ -977,46 +1245,824 @@ def get_child_follow_ups(
 def update_follow_up(
     follow_up_id: int,
     data: FollowUpUpdate,
-    current_user: User = Depends(require_role("worker", "supervisor")),
+    current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
     follow_up = db.query(FollowUp).filter(FollowUp.id == follow_up_id).first()
     if not follow_up:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Follow-up not found.")
 
+    prev_status = follow_up.status
     follow_up.status = data.status
+
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="UPDATE_FOLLOWUP",
+        record_type="follow_up",
+        record_id=follow_up.id,
+        child_id=follow_up.child_id,
+        fields_changed="status",
+        previous_values={"status": prev_status},
+        new_values={"status": follow_up.status}
+    )
+
     db.commit()
     db.refresh(follow_up)
     return follow_up
 
 
 # ==============================================================================
-# PHASE 13: SUPERVISOR ANALYTICS
+# PHASE 13: DEDICATED AUTHORITY (SUPERVISOR) PORTAL APIS
 # ==============================================================================
 
-@app.get("/supervisor/dashboard")
-def get_supervisor_analytics(
+@app.get("/supervisor/dashboard", response_model=SupervisorDashboardStats)
+def get_supervisor_dashboard(
     current_user: User = Depends(require_role("supervisor")),
     db: Session = Depends(get_db)
 ):
-    total_children = db.query(func.count(Child.id)).scalar() or 0
-    total_workers = db.query(func.count(User.id)).filter(User.role == "worker").scalar() or 0
-    total_vaccinations = db.query(func.count(Vaccination.id)).scalar() or 0
-    completed_vaccinations = db.query(func.count(Vaccination.id)).filter(Vaccination.completed.is_(True)).scalar() or 0
-    pending_followups = db.query(func.count(FollowUp.id)).filter(FollowUp.status == "pending").scalar() or 0
-    upcoming_appointments = db.query(func.count(Appointment.id)).filter(
-        Appointment.appointment_date >= date.today(),
-        Appointment.status.in_(["requested", "approved", "rescheduled"])
-    ).scalar() or 0
+    jurisdiction = get_supervisor_jurisdiction(current_user)
+    worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+    child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
 
-    return {
-        "total_children": total_children,
-        "total_workers": total_workers,
-        "total_vaccinations": total_vaccinations,
-        "completed_vaccinations": completed_vaccinations,
-        "pending_followups": pending_followups,
-        "upcoming_appointments": upcoming_appointments
+    today = date.today()
+    total_workers = len(worker_ids)
+    total_children = len(child_ids)
+
+    vac_query = db.query(Vaccination).filter(Vaccination.child_id.in_(child_ids) if child_ids else False)
+    total_vaccinations = vac_query.count()
+    completed_vaccinations = vac_query.filter(Vaccination.completed.is_(True)).count()
+    overdue_vaccinations = vac_query.filter(
+        Vaccination.completed.is_(False),
+        Vaccination.due_date < today
+    ).count()
+
+    fu_query = db.query(FollowUp).filter(FollowUp.child_id.in_(child_ids) if child_ids else False)
+    pending_followups = fu_query.filter(FollowUp.status == "pending").count()
+    overdue_followups = fu_query.filter(
+        FollowUp.status == "pending",
+        FollowUp.due_date < today
+    ).count()
+
+    upcoming_appointments = db.query(Appointment).filter(
+        Appointment.child_id.in_(child_ids) if child_ids else False,
+        Appointment.appointment_date >= today,
+        Appointment.status.in_(["requested", "approved", "rescheduled"])
+    ).count()
+
+    audit_query = db.query(AuditLog).filter(
+        (AuditLog.user_id.in_(worker_ids) if worker_ids else False) |
+        (AuditLog.child_id.in_(child_ids) if child_ids else False)
+    ).order_by(AuditLog.timestamp.desc()).limit(10)
+
+    recent_logs = audit_query.all()
+    recent_activity = []
+    for log in recent_logs:
+        w_user = db.query(User).filter(User.id == log.user_id).first()
+        c_record = db.query(Child).filter(Child.id == log.child_id).first() if log.child_id else None
+        recent_activity.append(AuditLogResponse(
+            id=log.id,
+            user_id=log.user_id,
+            worker_name=w_user.name if w_user else f"Worker #{log.user_id}",
+            worker_id_code=w_user.worker_id if w_user else None,
+            child_id=log.child_id,
+            child_name=c_record.name if c_record else None,
+            action_type=log.action_type,
+            record_type=log.record_type,
+            record_id=log.record_id,
+            fields_changed=log.fields_changed,
+            previous_values=log.previous_values,
+            new_values=log.new_values,
+            timestamp=log.timestamp
+        ))
+
+    vaccination_trends = []
+    for m_offset in range(5, -1, -1):
+        target_month = (today.replace(day=1) - timedelta(days=m_offset * 30)).replace(day=1)
+        next_month = (target_month + timedelta(days=32)).replace(day=1)
+        count = db.query(Vaccination).filter(
+            Vaccination.child_id.in_(child_ids) if child_ids else False,
+            Vaccination.completed.is_(True),
+            Vaccination.administered_date >= target_month,
+            Vaccination.administered_date < next_month
+        ).count()
+        vaccination_trends.append({
+            "month": target_month.strftime("%b %Y"),
+            "completed": count
+        })
+
+    resolved_followups = fu_query.filter(FollowUp.status.in_(["completed", "resolved"])).count()
+    cancelled_followups = fu_query.filter(FollowUp.status == "cancelled").count()
+    followup_status_breakdown = {
+        "pending": pending_followups - overdue_followups,
+        "overdue": overdue_followups,
+        "completed": resolved_followups,
+        "cancelled": cancelled_followups
     }
+
+    return SupervisorDashboardStats(
+        jurisdiction=jurisdiction,
+        total_workers=total_workers,
+        total_children=total_children,
+        total_vaccinations=total_vaccinations,
+        completed_vaccinations=completed_vaccinations,
+        pending_followups=pending_followups,
+        overdue_followups=overdue_followups,
+        upcoming_appointments=upcoming_appointments,
+        overdue_vaccinations=overdue_vaccinations,
+        recent_activity=recent_activity,
+        vaccination_trends=vaccination_trends,
+        followup_status_breakdown=followup_status_breakdown
+    )
+
+
+@app.get("/supervisor/workers", response_model=List[SupervisorWorkerSummary])
+def get_supervisor_workers(
+    current_user: User = Depends(require_role("supervisor")),
+    db: Session = Depends(get_db)
+):
+    jurisdiction = get_supervisor_jurisdiction(current_user)
+    worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+
+    workers = db.query(User).filter(User.id.in_(worker_ids)).all() if worker_ids else []
+    result = []
+    for w in workers:
+        assigned_count = db.query(func.count(Child.id)).filter(Child.assigned_worker_id == w.id).scalar() or 0
+        vac_count = db.query(func.count(Vaccination.id)).filter(
+            Vaccination.completed.is_(True),
+            (Vaccination.worker_name == w.name) | (Vaccination.child_id.in_(
+                db.query(Child.id).filter(Child.assigned_worker_id == w.id)
+            ))
+        ).scalar() or 0
+        pending_fu = db.query(func.count(FollowUp.id)).filter(
+            FollowUp.created_by == w.id,
+            FollowUp.status == "pending"
+        ).scalar() or 0
+        last_log = db.query(AuditLog.timestamp).filter(AuditLog.user_id == w.id).order_by(AuditLog.timestamp.desc()).first()
+
+        result.append(SupervisorWorkerSummary(
+            id=w.id,
+            name=w.name,
+            email=w.email,
+            worker_id=w.worker_id,
+            village=w.village,
+            jurisdiction=w.jurisdiction,
+            assigned_children_count=assigned_count,
+            vaccinations_recorded_count=vac_count,
+            pending_followups_count=pending_fu,
+            last_activity=last_log[0] if last_log else None
+        ))
+    return result
+
+
+@app.get("/supervisor/workers/{worker_id}", response_model=SupervisorWorkerDetail)
+def get_supervisor_worker_detail(
+    worker_id: int,
+    current_user: User = Depends(require_role("supervisor")),
+    db: Session = Depends(get_db)
+):
+    jurisdiction = get_supervisor_jurisdiction(current_user)
+    allowed_worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+    if worker_id not in allowed_worker_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Worker outside assigned jurisdiction.")
+
+    w = db.query(User).filter(User.id == worker_id, User.role == "worker").first()
+    if not w:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found.")
+
+    children = db.query(Child).filter(Child.assigned_worker_id == w.id).all()
+    assigned_children = [
+        {
+            "id": c.id,
+            "name": c.name,
+            "date_of_birth": c.date_of_birth.isoformat(),
+            "gender": c.gender,
+            "village": c.village,
+            "priority_level": c.priority_level
+        }
+        for c in children
+    ]
+
+    vacs = db.query(Vaccination).filter(
+        (Vaccination.worker_name == w.name) |
+        (Vaccination.child_id.in_([c.id for c in children]) if children else False)
+    ).order_by(Vaccination.due_date.desc()).limit(50).all()
+    vaccination_activities = [
+        {
+            "id": v.id,
+            "child_id": v.child_id,
+            "vaccine_name": v.vaccine_name,
+            "administered_date": v.administered_date.isoformat() if v.administered_date else None,
+            "completed": v.completed,
+            "batch_number": v.batch_number,
+            "facility": v.facility
+        }
+        for v in vacs
+    ]
+
+    fus = db.query(FollowUp).filter(FollowUp.created_by == w.id).order_by(FollowUp.due_date.desc()).limit(50).all()
+    follow_ups = [
+        {
+            "id": f.id,
+            "child_id": f.child_id,
+            "due_date": f.due_date.isoformat(),
+            "reason": f.reason,
+            "status": f.status
+        }
+        for f in fus
+    ]
+
+    apts = db.query(Appointment).filter(
+        Appointment.child_id.in_([c.id for c in children]) if children else False
+    ).order_by(Appointment.appointment_date.desc()).limit(50).all()
+    appointments = [
+        {
+            "id": a.id,
+            "child_id": a.child_id,
+            "appointment_date": a.appointment_date.isoformat(),
+            "reason": a.reason,
+            "status": a.status
+        }
+        for a in apts
+    ]
+
+    logs = db.query(AuditLog).filter(AuditLog.user_id == w.id).order_by(AuditLog.timestamp.desc()).limit(50).all()
+    recent_record_updates = [
+        AuditLogResponse(
+            id=l.id,
+            user_id=l.user_id,
+            worker_name=w.name,
+            worker_id_code=w.worker_id,
+            child_id=l.child_id,
+            child_name=db.query(Child.name).filter(Child.id == l.child_id).scalar() if l.child_id else None,
+            action_type=l.action_type,
+            record_type=l.record_type,
+            record_id=l.record_id,
+            fields_changed=l.fields_changed,
+            previous_values=l.previous_values,
+            new_values=l.new_values,
+            timestamp=l.timestamp
+        )
+        for l in logs
+    ]
+
+    return SupervisorWorkerDetail(
+        id=w.id,
+        name=w.name,
+        email=w.email,
+        phone=w.phone,
+        worker_id=w.worker_id,
+        village=w.village,
+        jurisdiction=w.jurisdiction,
+        assigned_children=assigned_children,
+        vaccination_activities=vaccination_activities,
+        follow_ups=follow_ups,
+        appointments=appointments,
+        recent_record_updates=recent_record_updates
+    )
+
+
+@app.get("/supervisor/children", response_model=List[SupervisorChildOverview])
+def get_supervisor_children(
+    current_user: User = Depends(require_role("supervisor")),
+    db: Session = Depends(get_db)
+):
+    jurisdiction = get_supervisor_jurisdiction(current_user)
+    worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+    child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+
+    children = db.query(Child).filter(Child.id.in_(child_ids)).all() if child_ids else []
+    today = date.today()
+    result = []
+    for c in children:
+        days = (today - c.date_of_birth).days
+        if days < 60:
+            age_str = f"{days // 7} weeks"
+        elif days < 365:
+            age_str = f"{days // 30} months"
+        else:
+            age_str = f"{days // 365} yr, {(days % 365) // 30} mo"
+
+        w_name = None
+        if c.assigned_worker_id:
+            w_user = db.query(User).filter(User.id == c.assigned_worker_id).first()
+            if w_user:
+                w_name = w_user.name
+
+        total_doses = db.query(func.count(Vaccination.id)).filter(Vaccination.child_id == c.id).scalar() or 0
+        comp_doses = db.query(func.count(Vaccination.id)).filter(
+            Vaccination.child_id == c.id,
+            Vaccination.completed.is_(True)
+        ).scalar() or 0
+        has_overdue = db.query(Vaccination.id).filter(
+            Vaccination.child_id == c.id,
+            Vaccination.completed.is_(False),
+            Vaccination.due_date < today
+        ).first() is not None
+
+        if comp_doses == total_doses and total_doses > 0:
+            vac_status = "Up to Date"
+        elif has_overdue:
+            vac_status = "Overdue"
+        else:
+            vac_status = "Pending"
+
+        pending_fus = db.query(func.count(FollowUp.id)).filter(
+            FollowUp.child_id == c.id,
+            FollowUp.status == "pending"
+        ).scalar() or 0
+
+        result.append(SupervisorChildOverview(
+            id=c.id,
+            name=c.name,
+            date_of_birth=c.date_of_birth,
+            age_display=age_str,
+            gender=c.gender,
+            village=c.village,
+            assigned_worker_id=c.assigned_worker_id,
+            assigned_worker_name=w_name,
+            vaccination_status=vac_status,
+            completed_doses=comp_doses,
+            total_doses=total_doses,
+            pending_followups_count=pending_fus,
+            migration_status=c.migration_status,
+            priority_level=c.priority_level
+        ))
+    return result
+
+
+@app.get("/supervisor/children/{child_id}", response_model=SupervisorChildDetail)
+def get_supervisor_child_detail(
+    child_id: int,
+    current_user: User = Depends(require_role("supervisor")),
+    db: Session = Depends(get_db)
+):
+    jurisdiction = get_supervisor_jurisdiction(current_user)
+    worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+    child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+    if child_id not in child_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Child record outside assigned jurisdiction.")
+
+    c = db.query(Child).filter(Child.id == child_id).first()
+    if not c:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child record not found.")
+
+    today = date.today()
+    days = (today - c.date_of_birth).days
+    age_str = f"{days // 30} months" if days < 365 else f"{days // 365} years"
+
+    parent_user = db.query(User).filter(User.id == c.parent_id).first()
+    worker_user = db.query(User).filter(User.id == c.assigned_worker_id).first() if c.assigned_worker_id else None
+
+    vaccinations = db.query(Vaccination).filter(Vaccination.child_id == c.id).order_by(Vaccination.due_date).all()
+    follow_ups = db.query(FollowUp).filter(FollowUp.child_id == c.id).order_by(FollowUp.due_date).all()
+    growth_records = db.query(GrowthRecord).filter(GrowthRecord.child_id == c.id).order_by(GrowthRecord.measurement_date.desc()).all()
+    appointments = db.query(Appointment).filter(Appointment.child_id == c.id).order_by(Appointment.appointment_date.desc()).all()
+    audit_logs = db.query(AuditLog).filter(AuditLog.child_id == c.id).order_by(AuditLog.timestamp.desc()).all()
+
+    audit_responses = []
+    for l in audit_logs:
+        u = db.query(User).filter(User.id == l.user_id).first()
+        audit_responses.append(AuditLogResponse(
+            id=l.id,
+            user_id=l.user_id,
+            worker_name=u.name if u else f"User #{l.user_id}",
+            worker_id_code=u.worker_id if u else None,
+            child_id=l.child_id,
+            child_name=c.name,
+            action_type=l.action_type,
+            record_type=l.record_type,
+            record_id=l.record_id,
+            fields_changed=l.fields_changed,
+            previous_values=l.previous_values,
+            new_values=l.new_values,
+            timestamp=l.timestamp
+        ))
+
+    return SupervisorChildDetail(
+        id=c.id,
+        name=c.name,
+        date_of_birth=c.date_of_birth,
+        age_display=age_str,
+        gender=c.gender,
+        village=c.village,
+        blood_group=c.blood_group,
+        birth_weight_kg=c.birth_weight_kg,
+        migration_status=c.migration_status,
+        priority_level=c.priority_level,
+        parent_name=parent_user.name if parent_user else None,
+        assigned_worker_name=worker_user.name if worker_user else None,
+        vaccinations=vaccinations,
+        follow_ups=follow_ups,
+        growth_records=growth_records,
+        appointments=appointments,
+        audit_trail=audit_responses
+    )
+
+
+@app.get("/supervisor/vaccinations", response_model=SupervisorVaccinationMonitoring)
+def get_supervisor_vaccinations(
+    current_user: User = Depends(require_role("supervisor")),
+    db: Session = Depends(get_db)
+):
+    jurisdiction = get_supervisor_jurisdiction(current_user)
+    worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+    child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+
+    today = date.today()
+    vac_query = db.query(Vaccination).filter(Vaccination.child_id.in_(child_ids) if child_ids else False)
+    total_scheduled = vac_query.count()
+    completed = vac_query.filter(Vaccination.completed.is_(True)).count()
+    overdue = vac_query.filter(Vaccination.completed.is_(False), Vaccination.due_date < today).count()
+    pending = total_scheduled - completed - overdue
+
+    workers = db.query(User).filter(User.id.in_(worker_ids)).all() if worker_ids else []
+    worker_breakdown = []
+    for w in workers:
+        w_doses = db.query(func.count(Vaccination.id)).filter(
+            Vaccination.completed.is_(True),
+            (Vaccination.worker_name == w.name) | (Vaccination.child_id.in_(
+                db.query(Child.id).filter(Child.assigned_worker_id == w.id)
+            ))
+        ).scalar() or 0
+        worker_breakdown.append({
+            "worker_id": w.id,
+            "worker_name": w.name,
+            "worker_id_code": w.worker_id,
+            "village": w.village,
+            "completed_doses": w_doses
+        })
+
+    timeline = []
+    for m in range(5, -1, -1):
+        target_month = (today.replace(day=1) - timedelta(days=m * 30)).replace(day=1)
+        next_month = (target_month + timedelta(days=32)).replace(day=1)
+        c_count = vac_query.filter(
+            Vaccination.completed.is_(True),
+            Vaccination.administered_date >= target_month,
+            Vaccination.administered_date < next_month
+        ).count()
+        timeline.append({
+            "month": target_month.strftime("%b %Y"),
+            "doses_administered": c_count
+        })
+
+    overdue_vacs = vac_query.filter(Vaccination.completed.is_(False), Vaccination.due_date < today).all()
+    overdue_child_ids = list({v.child_id for v in overdue_vacs})
+    children_req_followup = []
+    for cid in overdue_child_ids[:20]:
+        ch = db.query(Child).filter(Child.id == cid).first()
+        if ch:
+            ch_overdues = [v.vaccine_name for v in overdue_vacs if v.child_id == cid]
+            w_u = db.query(User).filter(User.id == ch.assigned_worker_id).first() if ch.assigned_worker_id else None
+            children_req_followup.append({
+                "child_id": ch.id,
+                "child_name": ch.name,
+                "village": ch.village,
+                "assigned_worker_name": w_u.name if w_u else None,
+                "overdue_vaccines": ch_overdues
+            })
+
+    return SupervisorVaccinationMonitoring(
+        total_scheduled=total_scheduled,
+        completed=completed,
+        pending=pending,
+        overdue=overdue,
+        worker_breakdown=worker_breakdown,
+        timeline=timeline,
+        children_requiring_followup=children_req_followup
+    )
+
+
+@app.get("/supervisor/follow-ups", response_model=List[SupervisorFollowUpOverview])
+def get_supervisor_followups(
+    current_user: User = Depends(require_role("supervisor")),
+    db: Session = Depends(get_db)
+):
+    jurisdiction = get_supervisor_jurisdiction(current_user)
+    worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+    child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+
+    today = date.today()
+    fus = db.query(FollowUp).filter(
+        FollowUp.child_id.in_(child_ids) if child_ids else False
+    ).order_by(FollowUp.due_date.asc()).all()
+
+    result = []
+    for f in fus:
+        ch = db.query(Child).filter(Child.id == f.child_id).first()
+        w = db.query(User).filter(User.id == ch.assigned_worker_id).first() if ch and ch.assigned_worker_id else None
+        creator = db.query(User).filter(User.id == f.created_by).first()
+        is_ov = (f.status == "pending" and f.due_date < today)
+
+        result.append(SupervisorFollowUpOverview(
+            id=f.id,
+            child_id=f.child_id,
+            child_name=ch.name if ch else f"Child #{f.child_id}",
+            village=ch.village if ch else None,
+            assigned_worker_name=w.name if w else None,
+            due_date=f.due_date,
+            reason=f.reason,
+            status=f.status,
+            is_overdue=is_ov,
+            created_by_worker=creator.name if creator else None
+        ))
+    return result
+
+
+@app.get("/supervisor/audit-logs", response_model=List[AuditLogResponse])
+def get_supervisor_audit_logs(
+    worker_id: Optional[int] = None,
+    child_id: Optional[int] = None,
+    action_type: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    current_user: User = Depends(require_role("supervisor")),
+    db: Session = Depends(get_db)
+):
+    jurisdiction = get_supervisor_jurisdiction(current_user)
+    worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+    child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+
+    query = db.query(AuditLog).filter(
+        (AuditLog.user_id.in_(worker_ids) if worker_ids else False) |
+        (AuditLog.child_id.in_(child_ids) if child_ids else False)
+    )
+
+    if worker_id is not None:
+        if worker_id not in worker_ids:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Worker outside jurisdiction.")
+        query = query.filter(AuditLog.user_id == worker_id)
+
+    if child_id is not None:
+        if child_id not in child_ids:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Child outside jurisdiction.")
+        query = query.filter(AuditLog.child_id == child_id)
+
+    if action_type:
+        query = query.filter(AuditLog.action_type == action_type.strip())
+
+    if start_date:
+        query = query.filter(AuditLog.timestamp >= datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc))
+
+    if end_date:
+        query = query.filter(AuditLog.timestamp <= datetime.combine(end_date, datetime.max.time(), tzinfo=timezone.utc))
+
+    logs = query.order_by(AuditLog.timestamp.desc()).limit(200).all()
+
+    result = []
+    for l in logs:
+        u = db.query(User).filter(User.id == l.user_id).first()
+        ch = db.query(Child).filter(Child.id == l.child_id).first() if l.child_id else None
+        result.append(AuditLogResponse(
+            id=l.id,
+            user_id=l.user_id,
+            worker_name=u.name if u else f"User #{l.user_id}",
+            worker_id_code=u.worker_id if u else None,
+            child_id=l.child_id,
+            child_name=ch.name if ch else None,
+            action_type=l.action_type,
+            record_type=l.record_type,
+            record_id=l.record_id,
+            fields_changed=l.fields_changed,
+            previous_values=l.previous_values,
+            new_values=l.new_values,
+            timestamp=l.timestamp
+        ))
+    return result
+
+
+@app.get("/supervisor/reports", response_model=SupervisorReportSummary)
+def get_supervisor_reports(
+    current_user: User = Depends(require_role("supervisor")),
+    db: Session = Depends(get_db)
+):
+    jurisdiction = get_supervisor_jurisdiction(current_user)
+    worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+    child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+
+    today = date.today()
+    total_workers = len(worker_ids)
+    total_children = len(child_ids)
+
+    vac_query = db.query(Vaccination).filter(Vaccination.child_id.in_(child_ids) if child_ids else False)
+    total_vacs = vac_query.count()
+    completed_vacs = vac_query.filter(Vaccination.completed.is_(True)).count()
+    overdue_vacs = vac_query.filter(Vaccination.completed.is_(False), Vaccination.due_date < today).count()
+
+    pending_fu = db.query(FollowUp).filter(
+        FollowUp.child_id.in_(child_ids) if child_ids else False,
+        FollowUp.status == "pending"
+    ).count()
+
+    workers = db.query(User).filter(User.id.in_(worker_ids)).all() if worker_ids else []
+    worker_perf = []
+    for w in workers:
+        assigned = db.query(func.count(Child.id)).filter(Child.assigned_worker_id == w.id).scalar() or 0
+        comp_doses = db.query(func.count(Vaccination.id)).filter(
+            Vaccination.completed.is_(True),
+            (Vaccination.worker_name == w.name) | (Vaccination.child_id.in_(
+                db.query(Child.id).filter(Child.assigned_worker_id == w.id)
+            ))
+        ).scalar() or 0
+        pending_f = db.query(func.count(FollowUp.id)).filter(FollowUp.created_by == w.id, FollowUp.status == "pending").scalar() or 0
+        worker_perf.append({
+            "worker_id": w.id,
+            "worker_name": w.name,
+            "worker_id_code": w.worker_id,
+            "assigned_children": assigned,
+            "completed_vaccinations": comp_doses,
+            "pending_followups": pending_f
+        })
+
+    trends = []
+    for m in range(5, -1, -1):
+        target_month = (today.replace(day=1) - timedelta(days=m * 30)).replace(day=1)
+        next_month = (target_month + timedelta(days=32)).replace(day=1)
+        c_count = vac_query.filter(
+            Vaccination.completed.is_(True),
+            Vaccination.administered_date >= target_month,
+            Vaccination.administered_date < next_month
+        ).count()
+        trends.append({
+            "month": target_month.strftime("%b %Y"),
+            "completed_doses": c_count
+        })
+
+    return SupervisorReportSummary(
+        generated_at=datetime.now(timezone.utc),
+        jurisdiction=jurisdiction,
+        total_workers=total_workers,
+        total_children=total_children,
+        total_vaccinations=total_vacs,
+        completed_vaccinations=completed_vacs,
+        overdue_vaccinations=overdue_vacs,
+        pending_followups=pending_fu,
+        worker_performance=worker_perf,
+        trends=trends
+    )
+
+
+@app.get("/supervisor/reports/export-csv")
+def export_supervisor_reports_csv(
+    current_user: User = Depends(require_role("supervisor")),
+    db: Session = Depends(get_db)
+):
+    jurisdiction = get_supervisor_jurisdiction(current_user)
+    worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+    child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+
+    today = date.today()
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(["NavJyoti Healthcare Authority Operations Report"])
+    writer.writerow(["Jurisdiction", jurisdiction])
+    writer.writerow(["Generated Date (UTC)", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")])
+    writer.writerow(["Total Supervised Workers", len(worker_ids)])
+    writer.writerow(["Total Supervised Children", len(child_ids)])
+    writer.writerow([])
+
+    writer.writerow(["Worker ID", "Name", "Worker Code", "Village/Area", "Assigned Children", "Vaccinations Recorded", "Pending Follow-ups"])
+    workers = db.query(User).filter(User.id.in_(worker_ids)).all() if worker_ids else []
+    for w in workers:
+        assigned = db.query(func.count(Child.id)).filter(Child.assigned_worker_id == w.id).scalar() or 0
+        comp_doses = db.query(func.count(Vaccination.id)).filter(
+            Vaccination.completed.is_(True),
+            (Vaccination.worker_name == w.name) | (Vaccination.child_id.in_(
+                db.query(Child.id).filter(Child.assigned_worker_id == w.id)
+            ))
+        ).scalar() or 0
+        p_fu = db.query(func.count(FollowUp.id)).filter(FollowUp.created_by == w.id, FollowUp.status == "pending").scalar() or 0
+        writer.writerow([w.id, w.name, w.worker_id or "N/A", w.village or "N/A", assigned, comp_doses, p_fu])
+
+    output.seek(0)
+    filename = f"navjyoti_authority_report_{jurisdiction.lower().replace(' ', '_')}_{today.isoformat()}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@app.get("/supervisor/alerts", response_model=List[SupervisorAlert])
+def get_supervisor_alerts(
+    current_user: User = Depends(require_role("supervisor")),
+    db: Session = Depends(get_db)
+):
+    jurisdiction = get_supervisor_jurisdiction(current_user)
+    worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+    child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+
+    today = date.today()
+    alerts = []
+
+    # 1. Overdue follow-ups
+    overdue_fus = db.query(FollowUp).filter(
+        FollowUp.child_id.in_(child_ids) if child_ids else False,
+        FollowUp.status == "pending",
+        FollowUp.due_date < today
+    ).order_by(FollowUp.due_date.asc()).limit(20).all()
+
+    for fu in overdue_fus:
+        ch = db.query(Child).filter(Child.id == fu.child_id).first()
+        days_overdue = (today - fu.due_date).days
+        alerts.append(SupervisorAlert(
+            id=f"fu-overdue-{fu.id}",
+            alert_type="overdue_followup",
+            severity="high",
+            title=f"Overdue Follow-up ({days_overdue} days)",
+            description=f"Follow-up for {ch.name if ch else 'child'} is overdue since {fu.due_date.isoformat()}. Reason: {fu.reason}",
+            child_id=fu.child_id,
+            worker_id=fu.created_by,
+            due_date=fu.due_date,
+            created_at=datetime.combine(fu.due_date, datetime.min.time(), tzinfo=timezone.utc)
+        ))
+
+    # 2. High priority child cases
+    high_priority_children = db.query(Child).filter(
+        Child.id.in_(child_ids) if child_ids else False,
+        Child.priority_level.in_(["red", "high", "critical"])
+    ).limit(10).all()
+
+    for ch in high_priority_children:
+        alerts.append(SupervisorAlert(
+            id=f"priority-child-{ch.id}",
+            alert_type="high_priority",
+            severity="high",
+            title=f"High Priority Child Flagged: {ch.name}",
+            description=f"Child {ch.name} in {ch.village or 'jurisdiction'} is marked with priority level '{ch.priority_level}'. Review clinical record.",
+            child_id=ch.id,
+            worker_id=ch.assigned_worker_id,
+            due_date=today,
+            created_at=datetime.now(timezone.utc)
+        ))
+
+    # 3. Unresolved appointments
+    missed_apts = db.query(Appointment).filter(
+        Appointment.child_id.in_(child_ids) if child_ids else False,
+        Appointment.status == "requested",
+        Appointment.appointment_date < today
+    ).limit(15).all()
+
+    for apt in missed_apts:
+        ch = db.query(Child).filter(Child.id == apt.child_id).first()
+        alerts.append(SupervisorAlert(
+            id=f"apt-missed-{apt.id}",
+            alert_type="unresolved_appointment",
+            severity="medium",
+            title=f"Unresolved Appointment on {apt.appointment_date.isoformat()}",
+            description=f"Appointment requested for {ch.name if ch else 'child'} was not confirmed or marked completed. Reason: {apt.reason}",
+            child_id=apt.child_id,
+            worker_id=ch.assigned_worker_id if ch else None,
+            due_date=apt.appointment_date,
+            created_at=datetime.combine(apt.appointment_date, datetime.min.time(), tzinfo=timezone.utc)
+        ))
+
+    # 4. Incomplete clinical records
+    incomplete_children = db.query(Child).filter(
+        Child.id.in_(child_ids) if child_ids else False,
+        (Child.birth_weight_kg.is_(None)) | (Child.blood_group.is_(None))
+    ).limit(10).all()
+
+    for ch in incomplete_children:
+        missing = []
+        if ch.birth_weight_kg is None: missing.append("birth weight")
+        if ch.blood_group is None: missing.append("blood group")
+        alerts.append(SupervisorAlert(
+            id=f"incomplete-child-{ch.id}",
+            alert_type="incomplete_record",
+            severity="low",
+            title=f"Incomplete Health Profile: {ch.name}",
+            description=f"Record is missing {' and '.join(missing)}. Frontline worker update required.",
+            child_id=ch.id,
+            worker_id=ch.assigned_worker_id,
+            due_date=today,
+            created_at=datetime.now(timezone.utc)
+        ))
+
+    return alerts
+
+
+@app.get("/supervisor/profile", response_model=SupervisorProfileResponse)
+def get_supervisor_profile(
+    current_user: User = Depends(require_role("supervisor")),
+    db: Session = Depends(get_db)
+):
+    jurisdiction = get_supervisor_jurisdiction(current_user)
+    worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+    child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+
+    return SupervisorProfileResponse(
+        id=current_user.id,
+        name=current_user.name,
+        email=current_user.email,
+        role=current_user.role,
+        jurisdiction=current_user.jurisdiction or jurisdiction,
+        village=current_user.village,
+        supervised_workers_count=len(worker_ids),
+        supervised_children_count=len(child_ids)
+    )
 
 
 # ==============================================================================
@@ -1180,7 +2226,7 @@ def mark_notification_read(
 )
 def send_communication(
     data: CommunicationCreate,
-    current_user: User = Depends(require_role("worker", "supervisor")),
+    current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
     comm = Communication(
@@ -1205,7 +2251,7 @@ def send_communication(
     response_model=List[CommunicationResponse]
 )
 def get_communications(
-    current_user: User = Depends(require_role("worker", "supervisor")),
+    current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
     return db.query(Communication).order_by(Communication.sent_at.desc()).limit(100).all()

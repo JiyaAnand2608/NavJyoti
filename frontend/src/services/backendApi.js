@@ -259,10 +259,59 @@ export const backendApi = {
       body: JSON.stringify(commData),
     }),
 
-  // Supervisor Analytics
+  // Supervisor & Authority Portal Endpoints
   getSupervisorDashboard: (token) =>
     request("/supervisor/dashboard", { token }),
 
+  getSupervisorWorkers: (token) =>
+    request("/supervisor/workers", { token }),
+
+  getSupervisorWorkerDetail: (workerId, token) =>
+    request(`/supervisor/workers/${workerId}`, { token }),
+
   getSupervisorChildren: (token) =>
     request("/supervisor/children", { token }),
+
+  getSupervisorChildDetail: (childId, token) =>
+    request(`/supervisor/children/${childId}`, { token }),
+
+  getSupervisorVaccinations: (token) =>
+    request("/supervisor/vaccinations", { token }),
+
+  getSupervisorFollowUps: (token) =>
+    request("/supervisor/follow-ups", { token }),
+
+  getSupervisorAuditLogs: (params = {}, token) => {
+    const searchParams = new URLSearchParams();
+    if (params.worker_id) searchParams.append("worker_id", params.worker_id);
+    if (params.child_id) searchParams.append("child_id", params.child_id);
+    if (params.action_type) searchParams.append("action_type", params.action_type);
+    if (params.start_date) searchParams.append("start_date", params.start_date);
+    if (params.end_date) searchParams.append("end_date", params.end_date);
+    const queryStr = searchParams.toString();
+    return request(`/supervisor/audit-logs${queryStr ? `?${queryStr}` : ""}`, { token });
+  },
+
+  getSupervisorReports: (token) =>
+    request("/supervisor/reports", { token }),
+
+  downloadSupervisorReportsCsv: async (token) => {
+    const storedToken = token || sessionStorage.getItem(TOKEN_KEY);
+    const url = `${API_BASE_URL}/supervisor/reports/export-csv`;
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${storedToken}`,
+      },
+    });
+    if (!res.ok) {
+      throw new Error(`CSV export failed (${res.status})`);
+    }
+    return res.blob();
+  },
+
+  getSupervisorAlerts: (token) =>
+    request("/supervisor/alerts", { token }),
+
+  getSupervisorProfile: (token) =>
+    request("/supervisor/profile", { token }),
 };

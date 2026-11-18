@@ -19,6 +19,8 @@ import {
   MessageSquare,
   BarChart3,
   QrCode,
+  Users,
+  History,
 } from 'lucide-react';
 
 export function MobileNavDrawer({ isOpen, onClose }) {
@@ -27,7 +29,7 @@ export function MobileNavDrawer({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  const isWorker = role === 'worker' || role === 'supervisor';
+  const currentRole = user?.role || role;
 
   const parentNav = [
     { name: "Dashboard", path: "/parent/dashboard", icon: LayoutDashboard },
@@ -48,12 +50,24 @@ export function MobileNavDrawer({ isOpen, onClose }) {
     { name: "Follow-ups", path: "/worker/priority", icon: ShieldAlert },
     { name: "Appointments", path: "/worker/appointments", icon: CalendarCheck },
     { name: "Messages", path: "/worker/messages", icon: MessageSquare },
-    { name: "Reports", path: "/supervisor/analytics", icon: BarChart3 },
     { name: "QR Handoff", path: "/worker/qr-handoff", icon: QrCode },
     { name: "Settings", path: "/worker/profile", icon: Settings },
   ];
 
-  const navItems = isWorker ? workerNav : parentNav;
+  const supervisorNav = [
+    { name: "Dashboard", path: "/supervisor/dashboard", icon: LayoutDashboard },
+    { name: "Healthcare Workers", path: "/supervisor/workers", icon: Users },
+    { name: "Child Registry", path: "/supervisor/children", icon: ClipboardList },
+    { name: "Vaccination Monitoring", path: "/supervisor/vaccinations", icon: Syringe },
+    { name: "Follow-Ups", path: "/supervisor/follow-ups", icon: ShieldAlert },
+    { name: "Activity Logs", path: "/supervisor/audit-logs", icon: History },
+    { name: "Reports & Analytics", path: "/supervisor/reports", icon: BarChart3 },
+    { name: "Alerts", path: "/supervisor/alerts", icon: Bell },
+    { name: "Profile / Settings", path: "/supervisor/profile", icon: Settings },
+  ];
+
+  const navItems = currentRole === 'supervisor' ? supervisorNav : currentRole === 'worker' ? workerNav : parentNav;
+  const homePath = currentRole === 'supervisor' ? "/supervisor/dashboard" : currentRole === 'worker' ? "/worker/dashboard" : "/parent/dashboard";
 
   const handleLogout = () => {
     logout();
@@ -69,7 +83,7 @@ export function MobileNavDrawer({ isOpen, onClose }) {
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-white/10">
             <Link
-              to={isWorker ? "/worker/dashboard" : "/parent/dashboard"}
+              to={homePath}
               onClick={onClose}
               className="flex items-center gap-3 group"
               title="Return to Portal Dashboard"

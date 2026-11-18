@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -332,3 +332,165 @@ class QRPublicResolverResponse(BaseModel):
     administered_doses: int
     verification_authority: str = "NavJyoti Health Record Platform"
     expires_at: datetime
+
+
+# ==============================================================================
+# AUTHORITY PORTAL & AUDIT TRAIL SCHEMAS
+# ==============================================================================
+
+class AuditLogResponse(BaseModel):
+    id: int
+    user_id: int
+    worker_name: Optional[str] = None
+    worker_id_code: Optional[str] = None
+    child_id: Optional[int] = None
+    child_name: Optional[str] = None
+    action_type: str
+    record_type: str
+    record_id: Optional[int] = None
+    fields_changed: Optional[str] = None
+    previous_values: Optional[str] = None
+    new_values: Optional[str] = None
+    timestamp: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SupervisorDashboardStats(BaseModel):
+    jurisdiction: str
+    total_workers: int
+    total_children: int
+    total_vaccinations: int
+    completed_vaccinations: int
+    pending_followups: int
+    overdue_followups: int
+    upcoming_appointments: int
+    overdue_vaccinations: int
+    recent_activity: List[AuditLogResponse]
+    vaccination_trends: List[dict]
+    followup_status_breakdown: dict
+
+
+class SupervisorWorkerSummary(BaseModel):
+    id: int
+    name: str
+    email: Optional[str] = None
+    worker_id: Optional[str] = None
+    village: Optional[str] = None
+    jurisdiction: Optional[str] = None
+    assigned_children_count: int
+    vaccinations_recorded_count: int
+    pending_followups_count: int
+    last_activity: Optional[datetime] = None
+
+
+class SupervisorWorkerDetail(BaseModel):
+    id: int
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    worker_id: Optional[str] = None
+    village: Optional[str] = None
+    jurisdiction: Optional[str] = None
+    assigned_children: List[dict]
+    vaccination_activities: List[dict]
+    follow_ups: List[dict]
+    appointments: List[dict]
+    recent_record_updates: List[AuditLogResponse]
+
+
+class SupervisorChildOverview(BaseModel):
+    id: int
+    name: str
+    date_of_birth: date
+    age_display: str
+    gender: Optional[str] = None
+    village: Optional[str] = None
+    assigned_worker_id: Optional[int] = None
+    assigned_worker_name: Optional[str] = None
+    vaccination_status: str
+    completed_doses: int
+    total_doses: int
+    pending_followups_count: int
+    migration_status: Optional[str] = None
+    priority_level: Optional[str] = None
+
+
+class SupervisorChildDetail(BaseModel):
+    id: int
+    name: str
+    date_of_birth: date
+    age_display: str
+    gender: Optional[str] = None
+    village: Optional[str] = None
+    blood_group: Optional[str] = None
+    birth_weight_kg: Optional[float] = None
+    migration_status: Optional[str] = None
+    priority_level: Optional[str] = None
+    parent_name: Optional[str] = None
+    assigned_worker_name: Optional[str] = None
+    vaccinations: List[VaccinationResponse]
+    follow_ups: List[FollowUpResponse]
+    growth_records: List[GrowthResponse]
+    appointments: List[AppointmentResponse]
+    audit_trail: List[AuditLogResponse]
+
+
+class SupervisorVaccinationMonitoring(BaseModel):
+    total_scheduled: int
+    completed: int
+    pending: int
+    overdue: int
+    worker_breakdown: List[dict]
+    timeline: List[dict]
+    children_requiring_followup: List[dict]
+
+
+class SupervisorFollowUpOverview(BaseModel):
+    id: int
+    child_id: int
+    child_name: str
+    village: Optional[str] = None
+    assigned_worker_name: Optional[str] = None
+    due_date: date
+    reason: str
+    status: str
+    is_overdue: bool
+    created_by_worker: Optional[str] = None
+
+
+class SupervisorReportSummary(BaseModel):
+    generated_at: datetime
+    jurisdiction: str
+    total_workers: int
+    total_children: int
+    total_vaccinations: int
+    completed_vaccinations: int
+    overdue_vaccinations: int
+    pending_followups: int
+    worker_performance: List[dict]
+    trends: List[dict]
+
+
+class SupervisorAlert(BaseModel):
+    id: str
+    alert_type: str
+    severity: str
+    title: str
+    description: str
+    child_id: Optional[int] = None
+    worker_id: Optional[int] = None
+    due_date: Optional[date] = None
+    created_at: datetime
+
+
+class SupervisorProfileResponse(BaseModel):
+    id: int
+    name: str
+    email: Optional[str] = None
+    role: str
+    jurisdiction: Optional[str] = None
+    village: Optional[str] = None
+    supervised_workers_count: int
+    supervised_children_count: int
+
