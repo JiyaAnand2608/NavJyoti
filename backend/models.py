@@ -9,7 +9,8 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Float,
-    Index
+    Index,
+    Text
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -35,6 +36,7 @@ class User(Base):
     preferred_language = Column(String(10), default="hi", nullable=True)
     worker_id = Column(String(50), nullable=True)
     consent = Column(Boolean, default=True, nullable=False)
+    jurisdiction = Column(String(100), nullable=True, index=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -57,6 +59,12 @@ class User(Base):
 
     notifications = relationship(
         "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+    audit_logs = relationship(
+        "AuditLog",
         back_populates="user",
         cascade="all, delete-orphan"
     )
@@ -139,6 +147,12 @@ class Child(Base):
 
     qr_tokens = relationship(
         "QRTokenRecord",
+        back_populates="child",
+        cascade="all, delete-orphan"
+    )
+
+    audit_logs = relationship(
+        "AuditLog",
         back_populates="child",
         cascade="all, delete-orphan"
     )
@@ -313,3 +327,26 @@ class QRTokenRecord(Base):
     is_revoked = Column(Boolean, default=False, nullable=False)
 
     child = relationship("Child", back_populates="qr_tokens")
+
+
+# ==========================
+# AUDIT LOG MODEL (PATIENT RECORD AUDIT TRAIL)
+# ==========================
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    child_id = Column(Integer, ForeignKey("children.id", ondelete="SET NULL"), nullable=True, index=True)
+    action_type = Column(String(50), nullable=False, index=True)
+    record_type = Column(String(50), nullable=False)
+    record_id = Column(Integer, nullable=True)
+    fields_changed = Column(String(500), nullable=True)
+    previous_values = Column(Text, nullable=True)
+    new_values = Column(Text, nullable=True)
+    timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+    user = relationship("User", back_populates="audit_logs")
+    child = relationship("Child", back_populates="audit_logs")
+

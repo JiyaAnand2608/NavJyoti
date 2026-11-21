@@ -58,7 +58,7 @@ export function LoginPage() {
   const dashboardPaths = {
     parent: '/parent/dashboard',
     worker: '/worker/dashboard',
-    supervisor: '/supervisor/analytics',
+    supervisor: '/supervisor/dashboard',
   };
 
   // Sync selected role when query params or navigation state change
@@ -173,7 +173,7 @@ export function LoginPage() {
     try {
       const user = await verifyWorkerOtp(email.trim(), selectedRole, otp.trim());
 
-      const targetPath = selectedRole === 'supervisor' ? '/supervisor/analytics' : '/worker/dashboard';
+      const targetPath = selectedRole === 'supervisor' ? '/supervisor/dashboard' : '/worker/dashboard';
       let dest = intendedDestination;
       if (dest && (dest.startsWith('/worker') || dest.startsWith('/supervisor'))) {
         navigate(dest, { replace: true });
@@ -202,12 +202,12 @@ export function LoginPage() {
     try {
       const user = await loginWithPassword(email.trim(), password);
 
-      if (user.role !== selectedRole && !(selectedRole === 'worker' && user.role === 'supervisor')) {
+      if (user.role !== selectedRole) {
         logout();
         throw new Error(`This account belongs to the ${user.role} role. Please select the correct portal.`);
       }
 
-      const targetPath = selectedRole === 'supervisor' ? '/supervisor/analytics' : '/worker/dashboard';
+      const targetPath = selectedRole === 'supervisor' ? '/supervisor/dashboard' : '/worker/dashboard';
       navigate(targetPath, { replace: true });
     } catch (error) {
       setErrorMsg(error.message || 'Login failed. Please check your credentials.');

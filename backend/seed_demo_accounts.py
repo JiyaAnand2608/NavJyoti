@@ -69,6 +69,7 @@ def seed_demo_accounts():
                 role="supervisor",
                 worker_id="MOIC-UP-BLS-1001",
                 village="Bilaspur Sadar",
+                jurisdiction="District HQ",
                 preferred_language="hi",
                 consent=True
             )
@@ -77,6 +78,7 @@ def seed_demo_accounts():
             db.refresh(supervisor)
             print(f"  -> Created Supervisor account: ID={supervisor.id}, Email={supervisor.email}")
         else:
+            supervisor.jurisdiction = "District HQ"
             if not verify_password(DEMO_PASSWORD_RAW, supervisor.password_hash):
                 supervisor.password_hash = hash_password(DEMO_PASSWORD_RAW)
                 supervisor.name = "Dr. Alok Verma"
@@ -85,6 +87,7 @@ def seed_demo_accounts():
                 db.commit()
                 print(f"  -> Updated Supervisor password hash: ID={supervisor.id}")
             else:
+                db.commit()
                 print(f"  -> Supervisor already present and verified: ID={supervisor.id}")
 
         print("[3/4] Checking and seeding Parent demo account...")

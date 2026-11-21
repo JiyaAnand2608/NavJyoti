@@ -291,9 +291,16 @@ class TestNavJyotiAPIIntegration(unittest.TestCase):
 
     def test_10_supervisor_analytics_dashboard(self):
         """Supervisor retrieves KPI statistics; non-supervisor is rejected."""
-        # Seed Supervisor
+        # Seed Supervisor with assigned jurisdiction
         db = TestingSessionLocal()
-        sup = User(name="Dr. MOIC", email="moic@navjyoti.gov.in", password_hash=main.hash_password("MoicPass123!"), role="supervisor")
+        sup = User(
+            name="Dr. MOIC",
+            email="moic@navjyoti.gov.in",
+            password_hash=main.hash_password("MoicPass123!"),
+            role="supervisor",
+            jurisdiction="District HQ",
+            village="District HQ"
+        )
         db.add(sup)
         db.commit()
         db.close()
