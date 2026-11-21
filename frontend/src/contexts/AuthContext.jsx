@@ -10,6 +10,7 @@ import {
   getAccounts,
   findAccountByPhoneOrId,
   DEFAULT_ACCOUNTS,
+  clearSession,
 } from '../services/storage';
 
 const AuthContext = createContext(null);
@@ -36,8 +37,9 @@ export function AuthProvider({ children }) {
             return;
           }
         } catch (error) {
-          console.warn('Stored JWT session invalid or expired, falling back:', error.message);
+          console.warn('Stored JWT session invalid or expired, clearing authentication:', error.message);
           sessionStorage.removeItem(TOKEN_KEY);
+          sessionStorage.removeItem(DEMO_USER_KEY);
         }
       }
 
@@ -303,6 +305,11 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(DEMO_USER_KEY);
+    try {
+      clearSession();
+    } catch (e) {
+      // Storage clearance error ignored
+    }
     setUser(null);
   }, []);
 
@@ -312,14 +319,12 @@ export function AuthProvider({ children }) {
 
   const isRoleAuthenticated = useCallback((requiredRole) => {
     if (!user) return false;
-    if (requiredRole === 'worker' || requiredRole === 'supervisor') {
-      return user.role === 'worker' || user.role === 'supervisor';
-    }
     return user.role === requiredRole;
   }, [user]);
 
   const parentUser = user?.role === 'parent' ? user : null;
-  const workerUser = (user?.role === 'worker' || user?.role === 'supervisor') ? user : null;
+  const workerUser = user?.role === 'worker' ? user : null;
+  const supervisorUser = user?.role === 'supervisor' ? user : null;
 
   return (
     <AuthContext.Provider
@@ -329,6 +334,7 @@ export function AuthProvider({ children }) {
         isAuthenticated: Boolean(user),
         parentUser,
         workerUser,
+        supervisorUser,
         isRoleAuthenticated,
         isLoading,
         isSimulated: Boolean(user?.isSimulated || !sessionStorage.getItem(TOKEN_KEY)),

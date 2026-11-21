@@ -38,7 +38,7 @@ export function ParentProfilePage() {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate('/auth/login', { replace: true });
   };
 
   const handleExecuteReset = () => {

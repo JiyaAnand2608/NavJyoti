@@ -31,7 +31,7 @@ export function WorkerProfilePage() {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate('/auth/login', { replace: true });
   };
 
   return (

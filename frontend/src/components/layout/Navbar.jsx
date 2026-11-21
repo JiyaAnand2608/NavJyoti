@@ -13,7 +13,12 @@ export function Navbar() {
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const dashboardPath = role === 'worker' ? '/worker/dashboard' : '/parent/dashboard';
+  const dashboardPath =
+    role === 'supervisor'
+      ? '/supervisor/dashboard'
+      : role === 'worker'
+      ? '/worker/dashboard'
+      : '/parent/dashboard';
   const isHome = location.pathname === '/';
 
   return (

@@ -23,18 +23,26 @@ import {
   FolderPlus,
   Headphones,
   Plus,
+  Building,
+  ShieldCheck,
 } from 'lucide-react';
 
 export function LandingPage() {
   const { lang, t } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, role } = useAuth();
   const navigate = useNavigate();
 
   const handleQuickAction = (targetPath) => {
     if (isAuthenticated) {
-      navigate(targetPath);
+      if (role === 'worker') {
+        navigate('/worker/dashboard');
+      } else if (role === 'supervisor') {
+        navigate('/supervisor/dashboard');
+      } else {
+        navigate(targetPath);
+      }
     } else {
-      navigate('/auth/login', { state: { from: targetPath } });
+      navigate('/auth/login?role=parent', { state: { role: 'parent', from: targetPath } });
     }
   };
 
@@ -149,12 +157,21 @@ export function LandingPage() {
                 </button>
 
                 <button
-                  onClick={() => navigate('/auth/login', { state: { role: 'worker', from: '/worker/dashboard' } })}
+                  onClick={() => navigate('/auth/login?role=worker', { state: { role: 'worker', from: '/worker/dashboard' } })}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-[#FBF8F2] hover:bg-white text-[#007F68] border border-[#007F68] font-semibold text-xs sm:text-sm shadow-2xs hover:shadow-xs transition-all cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5 text-[#007F68] stroke-[3]" />
                   <BriefcaseMedical className="w-4 h-4 text-[#007F68]" />
                   <span>{t('hero.workerLogin')}</span>
+                </button>
+
+                <button
+                  onClick={() => navigate('/auth/login?role=supervisor', { state: { role: 'supervisor', from: '/supervisor/dashboard' } })}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-[#103342] hover:bg-[#0C2733] text-white font-semibold text-xs sm:text-sm shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                  title="Supervisory & Medical Officer Sign In"
+                >
+                  <Building className="w-4 h-4 text-[#F4B83F]" />
+                  <span>Login as Authority</span>
                 </button>
               </div>
 

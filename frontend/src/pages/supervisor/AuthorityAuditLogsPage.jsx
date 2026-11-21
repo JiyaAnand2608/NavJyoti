@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { backendApi } from '../../services/backendApi';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
@@ -23,6 +24,7 @@ import {
 } from 'lucide-react';
 
 export function AuthorityAuditLogsPage() {
+  const { t } = useLanguage();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -44,11 +46,11 @@ export function AuthorityAuditLogsPage() {
       const data = await backendApi.getSupervisorAuditLogs(params);
       setLogs(data || []);
     } catch (err) {
-      setError(err.message || 'Failed to retrieve audit trail records.');
+      setError(err.message || t('errors.serverError', 'Failed to retrieve audit trail records.'));
     } finally {
       setLoading(false);
     }
-  }, [actionFilter, startDate, endDate]);
+  }, [actionFilter, startDate, endDate, t]);
 
   useEffect(() => {
     fetchLogs();
@@ -85,28 +87,29 @@ export function AuthorityAuditLogsPage() {
         <div>
           <div className="flex items-center gap-2">
             <History className="w-6 h-6 text-[#007F68]" />
-            <h1 className="text-2xl font-bold text-[#103342]">Patient Record Audit Trail</h1>
+            <h1 className="text-2xl font-bold text-[#103342]">{t('authority.auditLogsHeading', 'Patient Record Audit Trail')}</h1>
           </div>
           <p className="text-xs text-[#294B57]/80 mt-1">
-            Immutable, server-authenticated clinical record change history within your jurisdiction
+            {t('authority.auditLogsSub', 'Server-authenticated clinical record change history within your jurisdiction')}
           </p>
         </div>
 
         <Button onClick={fetchLogs} variant="outline" size="sm" disabled={loading} className="text-xs self-start sm:self-auto">
-          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh Trail
+          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> {t('authority.refreshBtn', 'Refresh Trail')}
         </Button>
       </div>
 
-      {/* Security Notice Banner */}
+      {/* Audit Notice Banner (Accurate, transparent, non-misleading) */}
       <Card className="p-4 bg-[#DDF0E3]/50 border-[#A8D5B5] flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <ShieldCheck className="w-5 h-5 text-[#007F68] shrink-0" />
           <p className="text-xs text-[#103342]">
-            <span className="font-bold">Cryptographically Secured & Server-Audited:</span> Every clinical update committed by frontline health workers is automatically recorded in the same database transaction. Records cannot be altered or purged.
+            <span className="font-bold">{t('authority.auditTrailTitle', 'Audit Trail Notice')}:</span>{' '}
+            {t('authority.auditTrailNotice', 'Operational change logs recorded by authorized health workers during vaccination and child care updates in this jurisdiction.')}
           </p>
         </div>
         <Badge variant="teal" size="sm" className="hidden sm:inline-flex">
-          Audit Grade
+          {t('status.normalPriority', 'Operational Log')}
         </Badge>
       </Card>
 
@@ -118,7 +121,7 @@ export function AuthorityAuditLogsPage() {
             <p className="text-xs text-[#103342]">{error}</p>
           </div>
           <Button onClick={fetchLogs} variant="primary" size="sm" className="text-xs">
-            Retry
+            {t('common.retry', 'Retry')}
           </Button>
         </Card>
       )}
@@ -133,7 +136,7 @@ export function AuthorityAuditLogsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search worker, child, ID..."
+              placeholder={t('authority.searchPlaceholder', 'Search worker, child, ID...')}
               className="w-full pl-9 pr-3 py-1.5 bg-white border border-[#D8E6DA] rounded-xl text-xs text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
             />
           </div>
@@ -145,7 +148,7 @@ export function AuthorityAuditLogsPage() {
               onChange={(e) => setActionFilter(e.target.value)}
               className="w-full bg-white border border-[#D8E6DA] rounded-xl px-3 py-1.5 text-xs text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
             >
-              <option value="ALL">All Action Types</option>
+              <option value="ALL">{t('common.all', 'All Action Types')}</option>
               <option value="ADMINISTER_VACCINE">Administer Vaccine</option>
               <option value="COMPLETE_VACCINATION">Complete Vaccination</option>
               <option value="SCHEDULE_VACCINATION">Schedule Vaccination</option>
@@ -187,16 +190,16 @@ export function AuthorityAuditLogsPage() {
       {loading && logs.length === 0 ? (
         <div className="min-h-[30vh] flex flex-col items-center justify-center p-6 text-center">
           <RefreshCw className="w-8 h-8 text-[#007F68] animate-spin mb-3" />
-          <p className="text-sm font-medium text-[#103342]">Fetching audit logs...</p>
+          <p className="text-sm font-medium text-[#103342]">{t('common.loading', 'Fetching audit logs...')}</p>
         </div>
       ) : filteredLogs.length === 0 ? (
         <Card className="p-12 bg-[#FBF8F2] border-[#D8E6DA] text-center rounded-2xl">
           <History className="w-12 h-12 text-[#294B57]/40 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-[#103342]">No Audit Trail Records Found</h3>
+          <h3 className="text-base font-bold text-[#103342]">{t('authority.emptyAudit', 'No Audit Trail Records Found')}</h3>
           <p className="text-xs text-[#294B57]/70 mt-1 max-w-md mx-auto">
             {searchQuery || actionFilter !== 'ALL' || startDate || endDate
-              ? 'No audit events match the specified search filters. Try clearing your filters.'
-              : 'There are currently no recorded clinical modifications in this jurisdiction. Clinical actions taken by frontline workers will be automatically displayed here.'}
+              ? t('authority.emptyAudit', 'No audit events match the specified search filters. Try clearing your filters.')
+              : t('authority.emptyAudit', 'There are currently no recorded clinical modifications in this jurisdiction.')}
           </p>
         </Card>
       ) : (
@@ -205,12 +208,12 @@ export function AuthorityAuditLogsPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-[#EBF3ED] text-[#103342] border-b border-[#D8E6DA] font-semibold">
                 <tr>
-                  <th className="py-3 px-4">Date & Time (IST)</th>
-                  <th className="py-3 px-4">Authorized Worker</th>
-                  <th className="py-3 px-4">Patient / Child</th>
-                  <th className="py-3 px-4">Action Performed</th>
-                  <th className="py-3 px-4">Fields Changed</th>
-                  <th className="py-3 px-4 text-right">Details</th>
+                  <th className="py-3 px-4">{t('common.administeredDate', 'Date & Time (IST)')}</th>
+                  <th className="py-3 px-4">{t('authority.assignedWorker', 'Authorized Worker')}</th>
+                  <th className="py-3 px-4">{t('common.name', 'Patient / Child')}</th>
+                  <th className="py-3 px-4">{t('authority.actionPerformed', 'Action Performed')}</th>
+                  <th className="py-3 px-4">{t('authority.fieldsChanged', 'Fields Changed')}</th>
+                  <th className="py-3 px-4 text-right">{t('common.actions', 'Details')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D8E6DA]/60">
@@ -254,7 +257,7 @@ export function AuthorityAuditLogsPage() {
                           <span className="text-[10px] text-[#294B57]/60">ID #{log.child_id}</span>
                         </div>
                       ) : log.child_id ? (
-                        <span className="font-mono text-[#294B57]">Child #{log.child_id}</span>
+                        <span className="font-mono text-[#294B57]">#{log.child_id}</span>
                       ) : (
                         <span className="text-[#294B57]/50">—</span>
                       )}
@@ -277,7 +280,7 @@ export function AuthorityAuditLogsPage() {
                         size="sm"
                         className="text-xs"
                       >
-                        <Eye className="w-3 h-3 mr-1 text-[#007F68]" /> View Change
+                        <Eye className="w-3 h-3 mr-1 text-[#007F68]" /> {t('authority.viewChange', 'View Change')}
                       </Button>
                     </td>
                   </tr>
@@ -293,13 +296,13 @@ export function AuthorityAuditLogsPage() {
         <Modal
           isOpen={Boolean(selectedLog)}
           onClose={() => setSelectedLog(null)}
-          title="Clinical Record Change Details"
+          title={t('authority.changeDetails', 'Clinical Record Change Details')}
         >
           <div className="space-y-4 text-xs">
             <div className="p-3 bg-[#EBF3ED] rounded-xl flex items-center justify-between">
               <div>
                 <span className="text-[10px] uppercase font-bold text-[#007F68] tracking-wider block">
-                  Action Performed
+                  {t('authority.actionPerformed', 'Action Performed')}
                 </span>
                 <span className="text-sm font-bold text-[#103342]">
                   {selectedLog.action_type.replace(/_/g, ' ')}
@@ -310,7 +313,7 @@ export function AuthorityAuditLogsPage() {
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="p-2.5 bg-white border border-[#D8E6DA] rounded-xl">
-                <span className="text-[#294B57]/70 block text-[11px]">Performing Worker</span>
+                <span className="text-[#294B57]/70 block text-[11px]">{t('authority.assignedWorker', 'Performing Worker')}</span>
                 <span className="font-bold text-[#103342] block mt-0.5">{selectedLog.worker_name}</span>
                 {selectedLog.worker_id_code && (
                   <span className="text-[10px] text-[#007F68] font-mono block">
@@ -320,20 +323,20 @@ export function AuthorityAuditLogsPage() {
               </div>
 
               <div className="p-2.5 bg-white border border-[#D8E6DA] rounded-xl">
-                <span className="text-[#294B57]/70 block text-[11px]">Affected Patient</span>
+                <span className="text-[#294B57]/70 block text-[11px]">{t('common.name', 'Affected Patient')}</span>
                 <span className="font-bold text-[#103342] block mt-0.5">
                   {selectedLog.child_name || (selectedLog.child_id ? `Child #${selectedLog.child_id}` : 'General')}
                 </span>
                 {selectedLog.child_id && (
                   <span className="text-[10px] text-[#294B57]/70 block">
-                    Child System ID: #{selectedLog.child_id}
+                    System ID: #{selectedLog.child_id}
                   </span>
                 )}
               </div>
             </div>
 
             <div className="p-2.5 bg-white border border-[#D8E6DA] rounded-xl">
-              <span className="text-[#294B57]/70 block text-[11px]">Timestamp (UTC / Local)</span>
+              <span className="text-[#294B57]/70 block text-[11px]">{t('common.administeredDate', 'Timestamp (UTC / Local)')}</span>
               <span className="font-semibold text-[#103342]">
                 {new Date(selectedLog.timestamp).toISOString()} (UTC) &bull;{' '}
                 {new Date(selectedLog.timestamp).toLocaleString('en-IN')} (IST)
@@ -342,25 +345,25 @@ export function AuthorityAuditLogsPage() {
 
             {/* Changed Values Comparison */}
             <div className="space-y-2 pt-2 border-t border-[#D8E6DA]">
-              <span className="font-bold text-[#103342] block">Mutated Field Values:</span>
+              <span className="font-bold text-[#103342] block">{t('authority.fieldsChanged', 'Mutated Field Values')}:</span>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Previous Values */}
                 <div className="p-3 bg-[#FDF8EF] border border-[#F4B83F]/30 rounded-xl space-y-1">
                   <span className="text-[10px] font-bold text-[#B87D14] uppercase tracking-wider block">
-                    Previous Value
+                    {t('authority.beforeValue', 'Previous Value')}
                   </span>
                   <pre className="font-mono text-[11px] text-[#103342] whitespace-pre-wrap overflow-x-auto">
                     {selectedLog.previous_values
                       ? JSON.stringify(parseJsonSafe(selectedLog.previous_values), null, 2)
-                      : 'None (Initial Creation)'}
+                      : t('authority.initialOrUnchanged', 'None (Initial Creation)')}
                   </pre>
                 </div>
 
                 {/* Updated Values */}
                 <div className="p-3 bg-[#DDF0E3] border border-[#007F68]/30 rounded-xl space-y-1">
                   <span className="text-[10px] font-bold text-[#007F68] uppercase tracking-wider block">
-                    Updated Value
+                    {t('authority.afterValue', 'Updated Value')}
                   </span>
                   <pre className="font-mono text-[11px] text-[#103342] whitespace-pre-wrap overflow-x-auto">
                     {selectedLog.new_values
@@ -373,7 +376,7 @@ export function AuthorityAuditLogsPage() {
 
             <div className="flex justify-end pt-3 border-t border-[#D8E6DA]">
               <Button onClick={() => setSelectedLog(null)} variant="primary" size="sm">
-                Close View
+                {t('authority.closeView', 'Close View')}
               </Button>
             </div>
           </div>

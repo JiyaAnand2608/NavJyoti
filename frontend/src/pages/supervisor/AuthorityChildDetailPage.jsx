@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { backendApi } from '../../services/backendApi';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
@@ -26,6 +27,7 @@ import {
 
 export function AuthorityChildDetailPage() {
   const { id } = useParams();
+  const { t } = useLanguage();
   const [child, setChild] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,11 +40,11 @@ export function AuthorityChildDetailPage() {
       const data = await backendApi.getSupervisorChildDetail(id);
       setChild(data);
     } catch (err) {
-      setError(err.message || 'Failed to retrieve child health record.');
+      setError(err.message || t('errors.serverError', 'Failed to retrieve child health record.'));
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     fetchChildDetail();
@@ -52,8 +54,8 @@ export function AuthorityChildDetailPage() {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
         <RefreshCw className="w-8 h-8 text-[#007F68] animate-spin mb-3" />
-        <p className="text-sm font-medium text-[#103342]">Retrieving child clinical records...</p>
-        <p className="text-xs text-[#294B57]/70 mt-1">Verifying jurisdiction access permissions</p>
+        <p className="text-sm font-medium text-[#103342]">{t('common.loading', 'Retrieving child clinical records...')}</p>
+        <p className="text-xs text-[#294B57]/70 mt-1">{t('authority.childHealthRecordSub', 'Verifying jurisdiction access permissions')}</p>
       </div>
     );
   }
@@ -63,16 +65,16 @@ export function AuthorityChildDetailPage() {
       <div className="p-6 max-w-xl mx-auto text-center">
         <Card className="p-6 bg-[#FDF8EF] border-[#E57373]/30">
           <AlertCircle className="w-12 h-12 text-[#D9534F] mx-auto mb-3" />
-          <h2 className="text-base font-bold text-[#103342]">Access Blocked or Record Not Found</h2>
+          <h2 className="text-base font-bold text-[#103342]">{t('errors.recordNotFound', 'Record Not Found')}</h2>
           <p className="text-xs text-[#294B57] mt-1 mb-4">{error}</p>
           <div className="flex justify-center gap-3">
             <Link to="/supervisor/children">
               <Button variant="outline" size="sm" className="text-xs">
-                Back to Registry
+                {t('authority.backToRegistry', 'Back to Registry')}
               </Button>
             </Link>
             <Button onClick={fetchChildDetail} variant="primary" size="sm" className="text-xs">
-              Retry
+              {t('common.retry', 'Retry')}
             </Button>
           </div>
         </Card>
@@ -89,11 +91,11 @@ export function AuthorityChildDetailPage() {
       <div className="flex items-center gap-3">
         <Link to="/supervisor/children">
           <Button variant="outline" size="sm" className="text-xs">
-            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" /> Back to Registry
+            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" /> {t('authority.backToRegistry', 'Back to Registry')}
           </Button>
         </Link>
         <span className="text-xs text-[#294B57]/50">/</span>
-        <span className="text-xs font-semibold text-[#103342]">Child Health Record</span>
+        <span className="text-xs font-semibold text-[#103342]">{t('authority.childHealthRecord', 'Child Health Record')}</span>
       </div>
 
       {/* Child Summary Card */}
@@ -107,26 +109,26 @@ export function AuthorityChildDetailPage() {
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold text-[#103342]">{child?.name}</h1>
                 <Badge variant={child?.priority_level === 'red' ? 'overdue' : 'upToDate'} size="sm">
-                  {child?.priority_level === 'red' ? 'High Priority' : 'Normal'}
+                  {child?.priority_level === 'red' ? t('status.highPriority', 'High Priority') : t('status.normalPriority', 'Normal')}
                 </Badge>
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#294B57] mt-1.5">
                 <span className="font-semibold text-[#103342]">{child?.age_display}</span>
                 <span className="text-[#294B57]/60">&bull;</span>
-                <span>DOB: {child?.date_of_birth}</span>
+                <span>{t('common.dob', 'DOB')}: {child?.date_of_birth}</span>
                 <span className="text-[#294B57]/60">&bull;</span>
-                <span>{child?.gender || 'Not specified'}</span>
+                <span>{child?.gender || '—'}</span>
                 <span className="text-[#294B57]/60">&bull;</span>
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5 text-[#007F68]" />
-                  {child?.village || 'Area N/A'}
+                  {child?.village || t('common.village', 'Area N/A')}
                 </span>
               </div>
             </div>
           </div>
 
           <Button onClick={fetchChildDetail} variant="outline" size="sm" disabled={loading} className="text-xs self-start sm:self-auto">
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> {t('common.refresh', 'Refresh')}
           </Button>
         </div>
 
@@ -145,21 +147,21 @@ export function AuthorityChildDetailPage() {
             </span>
           </div>
           <div className="p-3 bg-white rounded-xl border border-[#D8E6DA]">
-            <span className="text-[11px] text-[#294B57]/70 block">Caregiver / Parent</span>
+            <span className="text-[11px] text-[#294B57]/70 block">{t('common.caregiver', 'Caregiver')}</span>
             <span className="text-sm font-bold text-[#103342] mt-0.5 block">
               {child?.parent_name || 'Registered'}
             </span>
           </div>
           <div className="p-3 bg-white rounded-xl border border-[#D8E6DA]">
-            <span className="text-[11px] text-[#294B57]/70 block">Assigned Worker</span>
+            <span className="text-[11px] text-[#294B57]/70 block">{t('authority.assignedWorker', 'Assigned Worker')}</span>
             <span className="text-sm font-bold text-[#007F68] mt-0.5 block">
-              {child?.assigned_worker_name || 'Unassigned'}
+              {child?.assigned_worker_name || t('authority.unassigned', 'Unassigned')}
             </span>
           </div>
           <div className="p-3 bg-white rounded-xl border border-[#D8E6DA]">
-            <span className="text-[11px] text-[#294B57]/70 block">Vaccine Progress</span>
+            <span className="text-[11px] text-[#294B57]/70 block">{t('authority.vaccinationHeading', 'Vaccine Progress')}</span>
             <span className="text-sm font-bold text-[#103342] mt-0.5 block">
-              {completedCount} / {totalCount} doses
+              {completedCount} / {totalCount} {t('authority.doses', 'doses')}
             </span>
           </div>
         </div>
@@ -169,53 +171,53 @@ export function AuthorityChildDetailPage() {
       <div className="flex border-b border-[#D8E6DA] gap-2 overflow-x-auto text-xs font-semibold">
         <button
           onClick={() => setActiveTab('vaccines')}
-          className={`pb-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
+          className={`pb-3 px-3 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
             activeTab === 'vaccines'
               ? 'border-[#007F68] text-[#007F68]'
               : 'border-transparent text-[#294B57]/70 hover:text-[#103342]'
           }`}
         >
-          Vaccinations ({child?.vaccinations?.length || 0})
+          {t('sidebar.vaccinations', 'Vaccinations')} ({child?.vaccinations?.length || 0})
         </button>
         <button
           onClick={() => setActiveTab('followups')}
-          className={`pb-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
+          className={`pb-3 px-3 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
             activeTab === 'followups'
               ? 'border-[#007F68] text-[#007F68]'
               : 'border-transparent text-[#294B57]/70 hover:text-[#103342]'
           }`}
         >
-          Follow-Ups ({child?.follow_ups?.length || 0})
+          {t('authority.followupsTab', 'Follow-Ups')} ({child?.follow_ups?.length || 0})
         </button>
         <button
           onClick={() => setActiveTab('growth')}
-          className={`pb-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
+          className={`pb-3 px-3 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
             activeTab === 'growth'
               ? 'border-[#007F68] text-[#007F68]'
               : 'border-transparent text-[#294B57]/70 hover:text-[#103342]'
           }`}
         >
-          Growth Records ({child?.growth_records?.length || 0})
+          {t('authority.growthRecordsTab', 'Growth Records')} ({child?.growth_records?.length || 0})
         </button>
         <button
           onClick={() => setActiveTab('appointments')}
-          className={`pb-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
+          className={`pb-3 px-3 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
             activeTab === 'appointments'
               ? 'border-[#007F68] text-[#007F68]'
               : 'border-transparent text-[#294B57]/70 hover:text-[#103342]'
           }`}
         >
-          Appointments ({child?.appointments?.length || 0})
+          {t('authority.appointmentsTab', 'Appointments')} ({child?.appointments?.length || 0})
         </button>
         <button
           onClick={() => setActiveTab('audit')}
-          className={`pb-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
+          className={`pb-3 px-3 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
             activeTab === 'audit'
               ? 'border-[#007F68] text-[#007F68]'
               : 'border-transparent text-[#294B57]/70 hover:text-[#103342]'
           }`}
         >
-          Record Change History ({child?.audit_trail?.length || 0})
+          {t('authority.recordHistoryTab', 'Record Change History')} ({child?.audit_trail?.length || 0})
         </button>
       </div>
 
@@ -224,20 +226,20 @@ export function AuthorityChildDetailPage() {
         <Card className="p-0 bg-[#FBF8F2] border-[#D8E6DA] rounded-2xl overflow-hidden shadow-sm">
           {(!child?.vaccinations || child.vaccinations.length === 0) ? (
             <div className="p-8 text-center text-xs text-[#294B57]/70">
-              No vaccination records scheduled or administered for this child.
+              {t('authority.noVaccinationsLogged', 'No vaccination records scheduled or administered for this child.')}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#EBF3ED] text-[#103342] border-b border-[#D8E6DA] font-semibold">
                   <tr>
-                    <th className="py-3 px-4">Vaccine</th>
-                    <th className="py-3 px-4">Due Date</th>
-                    <th className="py-3 px-4">Administered Date</th>
-                    <th className="py-3 px-4">Batch #</th>
-                    <th className="py-3 px-4">Facility</th>
-                    <th className="py-3 px-4">Administered By</th>
-                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4">{t('authority.vaccinationHeading', 'Vaccine')}</th>
+                    <th className="py-3 px-4">{t('common.dueDate', 'Due Date')}</th>
+                    <th className="py-3 px-4">{t('common.administeredDate', 'Administered Date')}</th>
+                    <th className="py-3 px-4">{t('common.batchNumber', 'Batch #')}</th>
+                    <th className="py-3 px-4">{t('common.facility', 'Facility')}</th>
+                    <th className="py-3 px-4">{t('common.administeredBy', 'Administered By')}</th>
+                    <th className="py-3 px-4 text-center">{t('common.status', 'Status')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#D8E6DA]/60">
@@ -251,7 +253,7 @@ export function AuthorityChildDetailPage() {
                       <td className="py-3 px-4 text-[#103342]">{v.worker_name || '—'}</td>
                       <td className="py-3 px-4 text-center">
                         <Badge variant={v.completed ? 'upToDate' : 'dueSoon'} size="sm">
-                          {v.completed ? 'Completed' : 'Pending'}
+                          {v.completed ? t('common.completed', 'Completed') : t('common.pending', 'Pending')}
                         </Badge>
                       </td>
                     </tr>
@@ -267,16 +269,16 @@ export function AuthorityChildDetailPage() {
         <Card className="p-0 bg-[#FBF8F2] border-[#D8E6DA] rounded-2xl overflow-hidden shadow-sm">
           {(!child?.follow_ups || child.follow_ups.length === 0) ? (
             <div className="p-8 text-center text-xs text-[#294B57]/70">
-              No follow-up cases recorded for this child.
+              {t('authority.noFollowupsLogged', 'No follow-up cases recorded for this child.')}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#EBF3ED] text-[#103342] border-b border-[#D8E6DA] font-semibold">
                   <tr>
-                    <th className="py-3 px-4">Due Date</th>
-                    <th className="py-3 px-4">Reason / Notes</th>
-                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4">{t('common.dueDate', 'Due Date')}</th>
+                    <th className="py-3 px-4">{t('common.notes', 'Reason / Notes')}</th>
+                    <th className="py-3 px-4 text-center">{t('common.status', 'Status')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#D8E6DA]/60">
@@ -302,17 +304,17 @@ export function AuthorityChildDetailPage() {
         <Card className="p-0 bg-[#FBF8F2] border-[#D8E6DA] rounded-2xl overflow-hidden shadow-sm">
           {(!child?.growth_records || child.growth_records.length === 0) ? (
             <div className="p-8 text-center text-xs text-[#294B57]/70">
-              No growth measurements recorded for this child yet.
+              {t('authority.childHealthRecordSub', 'No growth measurements recorded for this child yet.')}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#EBF3ED] text-[#103342] border-b border-[#D8E6DA] font-semibold">
                   <tr>
-                    <th className="py-3 px-4">Measurement Date</th>
+                    <th className="py-3 px-4">{t('common.administeredDate', 'Measurement Date')}</th>
                     <th className="py-3 px-4">Weight (kg)</th>
                     <th className="py-3 px-4">Height (cm)</th>
-                    <th className="py-3 px-4">Recorded By User ID</th>
+                    <th className="py-3 px-4">{t('common.administeredBy', 'Recorded By')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#D8E6DA]/60">
@@ -335,16 +337,16 @@ export function AuthorityChildDetailPage() {
         <Card className="p-0 bg-[#FBF8F2] border-[#D8E6DA] rounded-2xl overflow-hidden shadow-sm">
           {(!child?.appointments || child.appointments.length === 0) ? (
             <div className="p-8 text-center text-xs text-[#294B57]/70">
-              No appointment history recorded for this child.
+              {t('authority.noAppointmentsLogged', 'No appointment history recorded for this child.')}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#EBF3ED] text-[#103342] border-b border-[#D8E6DA] font-semibold">
                   <tr>
-                    <th className="py-3 px-4">Appointment Date</th>
-                    <th className="py-3 px-4">Reason</th>
-                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4">{t('common.dob', 'Appointment Date')}</th>
+                    <th className="py-3 px-4">{t('common.notes', 'Reason')}</th>
+                    <th className="py-3 px-4 text-center">{t('common.status', 'Status')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#D8E6DA]/60">
@@ -370,18 +372,18 @@ export function AuthorityChildDetailPage() {
         <Card className="p-0 bg-[#FBF8F2] border-[#D8E6DA] rounded-2xl overflow-hidden shadow-sm">
           {(!child?.audit_trail || child.audit_trail.length === 0) ? (
             <div className="p-8 text-center text-xs text-[#294B57]/70">
-              No audit log entries recorded for this child yet.
+              {t('authority.emptyAudit', 'No audit log entries recorded for this child yet.')}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#EBF3ED] text-[#103342] border-b border-[#D8E6DA] font-semibold">
                   <tr>
-                    <th className="py-3 px-4">Timestamp</th>
-                    <th className="py-3 px-4">Worker</th>
-                    <th className="py-3 px-4">Action</th>
-                    <th className="py-3 px-4">Fields Changed</th>
-                    <th className="py-3 px-4">New Values</th>
+                    <th className="py-3 px-4">{t('common.administeredDate', 'Timestamp')}</th>
+                    <th className="py-3 px-4">{t('authority.assignedWorker', 'Worker')}</th>
+                    <th className="py-3 px-4">{t('authority.actionPerformed', 'Action')}</th>
+                    <th className="py-3 px-4">{t('authority.fieldsChanged', 'Fields Changed')}</th>
+                    <th className="py-3 px-4">{t('authority.afterValue', 'New Values')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#D8E6DA]/60">

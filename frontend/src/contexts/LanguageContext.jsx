@@ -1,42 +1,97 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { translations } from '../data/translations';
 
 const LanguageContext = createContext(null);
+const STORAGE_KEY = 'navjyoti_lang';
 
 export function LanguageProvider({ children }) {
-  const [lang, setLang] = useState(() => {
-    return localStorage.getItem('navjyoti_lang') || 'en';
+  const [lang, setLangState] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === 'hi' || stored === 'en') return stored;
+    } catch {
+      // localStorage may fail in restricted browser environments
+    }
+    return 'en';
   });
 
+  const setLang = useCallback((newLang) => {
+    const valid = newLang === 'hi' ? 'hi' : 'en';
+    setLangState(valid);
+    try {
+      localStorage.setItem(STORAGE_KEY, valid);
+    } catch {
+      // ignore
+    }
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = valid;
+    }
+  }, []);
+
+  const toggleLanguage = useCallback(() => {
+    setLangState((prev) => {
+      const next = prev === 'en' ? 'hi' : 'en';
+      try {
+        localStorage.setItem(STORAGE_KEY, next);
+      } catch {
+        // ignore
+      }
+      if (typeof document !== 'undefined') {
+        document.documentElement.lang = next;
+      }
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
-    localStorage.setItem('navjyoti_lang', lang);
+    try {
+      localStorage.setItem(STORAGE_KEY, lang);
+    } catch {
+      // ignore
+    }
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = lang;
+    }
   }, [lang]);
 
-  const toggleLanguage = () => {
-    setLang((prev) => (prev === 'en' ? 'hi' : 'en'));
-  };
+  const t = useCallback((path, fallbackStr) => {
+    if (!path) return fallbackStr || '';
+    const keys = String(path).split('.');
 
-  const t = (path) => {
-    const keys = path.split('.');
+    // Try current language
     let current = translations[lang] || translations.en;
+    let found = true;
     for (const key of keys) {
       if (current && current[key] !== undefined) {
         current = current[key];
       } else {
-        // Fallback to English
-        let fallback = translations.en;
-        for (const fKey of keys) {
-          if (fallback && fallback[fKey] !== undefined) {
-            fallback = fallback[fKey];
-          } else {
-            return path;
-          }
-        }
-        return fallback;
+        found = false;
+        break;
       }
     }
-    return current;
-  };
+
+    if (found && current !== undefined) {
+      return current;
+    }
+
+    // Fallback to English dictionary
+    let fallback = translations.en;
+    let fallbackFound = true;
+    for (const fKey of keys) {
+      if (fallback && fallback[fKey] !== undefined) {
+        fallback = fallback[fKey];
+      } else {
+        fallbackFound = false;
+        break;
+      }
+    }
+
+    if (fallbackFound && fallback !== undefined) {
+      return fallback;
+    }
+
+    return fallbackStr !== undefined ? fallbackStr : path;
+  }, [lang]);
 
   return (
     <LanguageContext.Provider value={{ lang, setLang, toggleLanguage, t }}>

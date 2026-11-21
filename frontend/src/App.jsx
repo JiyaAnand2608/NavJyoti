@@ -29,11 +29,11 @@ export default function App() {
     <BrowserRouter>
       <LanguageProvider>
         <AuthProvider>
-          <HealthDataProvider>
-            <OfflineProvider>
+          <OfflineProvider>
+            <HealthDataProvider>
               <AppRoutes />
-            </OfflineProvider>
-          </HealthDataProvider>
+            </HealthDataProvider>
+          </OfflineProvider>
         </AuthProvider>
       </LanguageProvider>
     </BrowserRouter>

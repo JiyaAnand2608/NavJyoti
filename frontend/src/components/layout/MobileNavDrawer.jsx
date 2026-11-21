@@ -1,10 +1,10 @@
 import React from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import {
   X,
   LogOut,
-  RefreshCw,
   LayoutDashboard,
   Baby,
   Syringe,
@@ -24,7 +24,8 @@ import {
 } from 'lucide-react';
 
 export function MobileNavDrawer({ isOpen, onClose }) {
-  const { user, role, logout, switchRole } = useAuth();
+  const { user, role, logout } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   if (!isOpen) return null;
@@ -32,47 +33,52 @@ export function MobileNavDrawer({ isOpen, onClose }) {
   const currentRole = user?.role || role;
 
   const parentNav = [
-    { name: "Dashboard", path: "/parent/dashboard", icon: LayoutDashboard },
-    { name: "My Children", path: "/parent/children", icon: Baby },
-    { name: "Vaccinations", path: "/parent/vaccines", icon: Syringe },
-    { name: "Milestones", path: "/parent/milestones", icon: Activity },
-    { name: "Health Records", path: "/parent/records", icon: FileText },
-    { name: "Appointments", path: "/parent/appointments", icon: CalendarCheck },
-    { name: "Notifications", path: "/parent/reminders", icon: Bell },
-    { name: "Help", path: "/parent/help", icon: HelpCircle },
-    { name: "Settings", path: "/parent/profile", icon: Settings },
+    { name: "Dashboard", translationKey: "sidebar.dashboard", path: "/parent/dashboard", icon: LayoutDashboard },
+    { name: "My Children", translationKey: "sidebar.myChildren", path: "/parent/children", icon: Baby },
+    { name: "Vaccinations", translationKey: "sidebar.vaccinations", path: "/parent/vaccines", icon: Syringe },
+    { name: "Milestones", translationKey: "sidebar.milestones", path: "/parent/milestones", icon: Activity },
+    { name: "Health Records", translationKey: "sidebar.healthRecords", path: "/parent/records", icon: FileText },
+    { name: "Appointments", translationKey: "sidebar.appointments", path: "/parent/appointments", icon: CalendarCheck },
+    { name: "Notifications", translationKey: "sidebar.notifications", path: "/parent/reminders", icon: Bell },
+    { name: "Help", translationKey: "sidebar.help", path: "/parent/help", icon: HelpCircle },
+    { name: "Settings", translationKey: "sidebar.settings", path: "/parent/profile", icon: Settings },
   ];
 
   const workerNav = [
-    { name: "Dashboard", path: "/worker/dashboard", icon: LayoutDashboard },
-    { name: "Child Registry", path: "/worker/registry", icon: ClipboardList },
-    { name: "Vaccinations", path: "/worker/vaccinations", icon: Syringe },
-    { name: "Follow-ups", path: "/worker/priority", icon: ShieldAlert },
-    { name: "Appointments", path: "/worker/appointments", icon: CalendarCheck },
-    { name: "Messages", path: "/worker/messages", icon: MessageSquare },
-    { name: "QR Handoff", path: "/worker/qr-handoff", icon: QrCode },
-    { name: "Settings", path: "/worker/profile", icon: Settings },
+    { name: "Dashboard", translationKey: "sidebar.dashboard", path: "/worker/dashboard", icon: LayoutDashboard },
+    { name: "Child Registry", translationKey: "sidebar.childRegistry", path: "/worker/registry", icon: ClipboardList },
+    { name: "Vaccinations", translationKey: "sidebar.vaccinations", path: "/worker/vaccinations", icon: Syringe },
+    { name: "Follow-ups", translationKey: "sidebar.followUps", path: "/worker/priority", icon: ShieldAlert },
+    { name: "Appointments", translationKey: "sidebar.appointments", path: "/worker/appointments", icon: CalendarCheck },
+    { name: "Messages", translationKey: "sidebar.messages", path: "/worker/messages", icon: MessageSquare },
+    { name: "QR Handoff", translationKey: "sidebar.qrHandoff", path: "/worker/qr-handoff", icon: QrCode },
+    { name: "Settings", translationKey: "sidebar.settings", path: "/worker/profile", icon: Settings },
   ];
 
   const supervisorNav = [
-    { name: "Dashboard", path: "/supervisor/dashboard", icon: LayoutDashboard },
-    { name: "Healthcare Workers", path: "/supervisor/workers", icon: Users },
-    { name: "Child Registry", path: "/supervisor/children", icon: ClipboardList },
-    { name: "Vaccination Monitoring", path: "/supervisor/vaccinations", icon: Syringe },
-    { name: "Follow-Ups", path: "/supervisor/follow-ups", icon: ShieldAlert },
-    { name: "Activity Logs", path: "/supervisor/audit-logs", icon: History },
-    { name: "Reports & Analytics", path: "/supervisor/reports", icon: BarChart3 },
-    { name: "Alerts", path: "/supervisor/alerts", icon: Bell },
-    { name: "Profile / Settings", path: "/supervisor/profile", icon: Settings },
+    { name: "Dashboard", translationKey: "sidebar.dashboard", path: "/supervisor/dashboard", icon: LayoutDashboard },
+    { name: "Healthcare Workers", translationKey: "sidebar.healthcareWorkers", path: "/supervisor/workers", icon: Users },
+    { name: "Child Registry", translationKey: "sidebar.childRegistry", path: "/supervisor/children", icon: ClipboardList },
+    { name: "Vaccination Monitoring", translationKey: "sidebar.vaccinationMonitoring", path: "/supervisor/vaccinations", icon: Syringe },
+    { name: "Follow-Ups", translationKey: "sidebar.followUps", path: "/supervisor/follow-ups", icon: ShieldAlert },
+    { name: "Activity Logs", translationKey: "sidebar.activityLogs", path: "/supervisor/audit-logs", icon: History },
+    { name: "Reports & Analytics", translationKey: "sidebar.reportsAnalytics", path: "/supervisor/reports", icon: BarChart3 },
+    { name: "Alerts", translationKey: "sidebar.alerts", path: "/supervisor/alerts", icon: Bell },
+    { name: "Profile / Settings", translationKey: "sidebar.profileSettings", path: "/supervisor/profile", icon: Settings },
   ];
 
   const navItems = currentRole === 'supervisor' ? supervisorNav : currentRole === 'worker' ? workerNav : parentNav;
   const homePath = currentRole === 'supervisor' ? "/supervisor/dashboard" : currentRole === 'worker' ? "/worker/dashboard" : "/parent/dashboard";
+  const portalName = currentRole === 'supervisor'
+    ? t('sidebar.authorityPortal', 'Authority Portal')
+    : currentRole === 'worker'
+    ? t('sidebar.workerPortal', 'Health Worker Portal')
+    : t('sidebar.caregiverPortal', 'Caregiver Portal');
 
   const handleLogout = () => {
     logout();
     onClose();
-    navigate('/');
+    navigate('/auth/login', { replace: true });
   };
 
   return (
@@ -98,7 +104,7 @@ export function MobileNavDrawer({ isOpen, onClose }) {
               <div>
                 <span className="font-bold text-base font-serif">NavJyoti</span>
                 <span className="block text-[10px] text-[#A8D5B5] font-semibold uppercase">
-                  {isWorker ? "Worker Portal" : "Parent Portal"}
+                  {portalName}
                 </span>
               </div>
             </Link>
@@ -115,6 +121,7 @@ export function MobileNavDrawer({ isOpen, onClose }) {
           <nav className="mt-4 space-y-1 overflow-y-auto max-h-[65vh]">
             {navItems.map((item) => {
               const Icon = item.icon;
+              const label = t(item.translationKey, item.name);
               return (
                 <NavLink
                   key={item.name}
@@ -127,7 +134,7 @@ export function MobileNavDrawer({ isOpen, onClose }) {
                   }
                 >
                   <Icon className="w-4 h-4 shrink-0" />
-                  <span>{item.name}</span>
+                  <span>{label}</span>
                 </NavLink>
               );
             })}
@@ -137,27 +144,11 @@ export function MobileNavDrawer({ isOpen, onClose }) {
         {/* Footer */}
         <div className="pt-4 border-t border-white/10 space-y-2">
           <button
-            onClick={() => {
-              onClose();
-              if (isWorker) {
-                switchRole('parent');
-                navigate('/auth/login?role=parent', { state: { role: 'parent', from: '/parent/dashboard' } });
-              } else {
-                switchRole('worker');
-                navigate('/auth/login?role=worker', { state: { role: 'worker', from: '/worker/dashboard' } });
-              }
-            }}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-white/10 text-xs font-medium hover:bg-white/15 cursor-pointer text-white"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Switch to {isWorker ? 'Parent Portal' : 'Worker Portal'}</span>
-          </button>
-          <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-red-500/20 text-red-200 text-xs font-medium hover:bg-red-500/30 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500/20 text-red-200 text-xs font-semibold hover:bg-red-500/30 cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Logout</span>
+            <span>{t('common.logout', 'Logout')}</span>
           </button>
         </div>
       </div>

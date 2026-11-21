@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { backendApi } from '../../services/backendApi';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 
 export function AuthorityReportsPage() {
+  const { t } = useLanguage();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -31,11 +33,11 @@ export function AuthorityReportsPage() {
       const data = await backendApi.getSupervisorReports();
       setReport(data);
     } catch (err) {
-      setError(err.message || 'Failed to aggregate authority reports.');
+      setError(err.message || t('errors.serverError', 'Failed to aggregate authority reports.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchReports();
@@ -64,8 +66,8 @@ export function AuthorityReportsPage() {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
         <RefreshCw className="w-8 h-8 text-[#007F68] animate-spin mb-3" />
-        <p className="text-sm font-medium text-[#103342]">Generating supervisory analytics report...</p>
-        <p className="text-xs text-[#294B57]/70 mt-1">Aggregating real operational database records</p>
+        <p className="text-sm font-medium text-[#103342]">{t('common.loading', 'Generating supervisory analytics report...')}</p>
+        <p className="text-xs text-[#294B57]/70 mt-1">{t('authority.reportsSub', 'Aggregating real operational database records')}</p>
       </div>
     );
   }
@@ -75,10 +77,10 @@ export function AuthorityReportsPage() {
       <div className="p-6 max-w-xl mx-auto text-center">
         <Card className="p-6 bg-[#FDF8EF] border-[#E57373]/30">
           <AlertCircle className="w-12 h-12 text-[#D9534F] mx-auto mb-3" />
-          <h2 className="text-base font-bold text-[#103342]">Report Generation Failed</h2>
+          <h2 className="text-base font-bold text-[#103342]">{t('errors.serverError', 'Report Generation Failed')}</h2>
           <p className="text-xs text-[#294B57] mt-1 mb-4">{error}</p>
           <Button onClick={fetchReports} variant="primary" size="sm" className="text-xs">
-            Retry
+            {t('common.retry', 'Retry')}
           </Button>
         </Card>
       </div>
@@ -94,16 +96,16 @@ export function AuthorityReportsPage() {
         <div>
           <div className="flex items-center gap-2">
             <BarChart3 className="w-6 h-6 text-[#007F68]" />
-            <h1 className="text-2xl font-bold text-[#103342]">Reports & Analytics</h1>
+            <h1 className="text-2xl font-bold text-[#103342]">{t('authority.reportsHeading', 'Reports & Analytics')}</h1>
           </div>
           <p className="text-xs text-[#294B57]/80 mt-1">
-            Aggregate clinical oversight and worker performance data for {report?.jurisdiction || 'your jurisdiction'}
+            {t('authority.reportsSub', 'Aggregate clinical oversight and worker performance data for your jurisdiction')}
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
           <Button onClick={fetchReports} variant="outline" size="sm" disabled={loading} className="text-xs">
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> {t('common.refresh', 'Refresh')}
           </Button>
           <Button
             onClick={handleDownloadCsv}
@@ -113,7 +115,7 @@ export function AuthorityReportsPage() {
             className="text-xs"
           >
             <Download className="w-3.5 h-3.5 mr-1.5" />
-            {exporting ? 'Exporting...' : 'Export Aggregate CSV'}
+            {exporting ? 'Exporting...' : t('authority.exportCsvBtn', 'Export Aggregate CSV')}
           </Button>
         </div>
       </div>
@@ -121,38 +123,38 @@ export function AuthorityReportsPage() {
       {/* Aggregate Overview Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="p-4 bg-[#FBF8F2] border-[#D8E6DA] rounded-2xl">
-          <span className="text-[11px] font-semibold text-[#294B57] block">Supervised Workers</span>
+          <span className="text-[11px] font-semibold text-[#294B57] block">{t('authority.supervisedWorkers', 'Supervised Workers')}</span>
           <span className="text-2xl font-black text-[#103342] mt-1 block">
             {report?.total_workers ?? 0}
           </span>
-          <span className="text-[10px] text-[#294B57]/70 mt-0.5 block">Frontline healthcare cadre</span>
+          <span className="text-[10px] text-[#294B57]/70 mt-0.5 block">{t('authority.supervisedWorkersSub', 'Frontline healthcare cadre')}</span>
         </Card>
 
         <Card className="p-4 bg-[#FBF8F2] border-[#D8E6DA] rounded-2xl">
-          <span className="text-[11px] font-semibold text-[#294B57] block">Registered Children</span>
+          <span className="text-[11px] font-semibold text-[#294B57] block">{t('authority.registeredChildren', 'Registered Children')}</span>
           <span className="text-2xl font-black text-[#103342] mt-1 block">
             {report?.total_children ?? 0}
           </span>
-          <span className="text-[10px] text-[#294B57]/70 mt-0.5 block">Under local oversight</span>
+          <span className="text-[10px] text-[#294B57]/70 mt-0.5 block">{t('authority.registeredChildrenSub', 'Under local oversight')}</span>
         </Card>
 
         <Card className="p-4 bg-[#FBF8F2] border-[#D8E6DA] rounded-2xl">
-          <span className="text-[11px] font-semibold text-[#294B57] block">Completed Doses</span>
+          <span className="text-[11px] font-semibold text-[#294B57] block">{t('authority.completedDoses', 'Completed Doses')}</span>
           <span className="text-2xl font-black text-[#007F68] mt-1 block">
             {report?.completed_vaccinations ?? 0}
           </span>
           <span className="text-[10px] text-[#294B57]/70 mt-0.5 block">
-            Out of {report?.total_vaccinations ?? 0} scheduled
+            Out of {report?.total_vaccinations ?? 0} {t('authority.totalScheduled', 'scheduled')}
           </span>
         </Card>
 
         <Card className="p-4 bg-[#FBF8F2] border-[#D8E6DA] rounded-2xl">
-          <span className="text-[11px] font-semibold text-[#294B57] block">Pending Follow-ups</span>
+          <span className="text-[11px] font-semibold text-[#294B57] block">{t('authority.pendingFollowups', 'Pending Follow-ups')}</span>
           <span className="text-2xl font-black text-[#B87D14] mt-1 block">
             {report?.pending_followups ?? 0}
           </span>
           <span className="text-[10px] text-[#294B57]/70 mt-0.5 block">
-            {report?.overdue_vaccinations ?? 0} overdue doses
+            {report?.overdue_vaccinations ?? 0} {t('common.overdue', 'overdue doses')}
           </span>
         </Card>
       </div>
@@ -164,22 +166,22 @@ export function AuthorityReportsPage() {
           <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA] rounded-2xl">
             <div className="flex items-center gap-2 mb-4">
               <Users className="w-5 h-5 text-[#007F68]" />
-              <h3 className="text-sm font-bold text-[#103342]">Healthcare Worker Performance</h3>
+              <h3 className="text-sm font-bold text-[#103342]">{t('authority.workersHeading', 'Healthcare Worker Performance')}</h3>
             </div>
 
             {(!report?.worker_performance || report.worker_performance.length === 0) ? (
               <div className="py-8 text-center text-xs text-[#294B57]/70">
-                No worker performance records found for this jurisdiction.
+                {t('authority.emptyWorkers', 'No worker performance records found for this jurisdiction.')}
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#EBF3ED] text-[#103342] border-b border-[#D8E6DA] font-semibold">
                     <tr>
-                      <th className="py-2.5 px-3">Worker Name</th>
-                      <th className="py-2.5 px-3 text-center">Assigned Children</th>
-                      <th className="py-2.5 px-3 text-center">Doses Administered</th>
-                      <th className="py-2.5 px-3 text-center">Pending Follow-ups</th>
+                      <th className="py-2.5 px-3">{t('authority.assignedWorker', 'Worker Name')}</th>
+                      <th className="py-2.5 px-3 text-center">{t('authority.assignedChildrenTab', 'Assigned Children')}</th>
+                      <th className="py-2.5 px-3 text-center">{t('authority.completedDoses', 'Doses Administered')}</th>
+                      <th className="py-2.5 px-3 text-center">{t('authority.pendingFollowups', 'Pending Follow-ups')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#D8E6DA]/60">
@@ -222,27 +224,27 @@ export function AuthorityReportsPage() {
           <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA] rounded-2xl h-full">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp className="w-5 h-5 text-[#007F68]" />
-              <h3 className="text-sm font-bold text-[#103342]">Dose Activity Trends</h3>
+              <h3 className="text-sm font-bold text-[#103342]">{t('authority.vaccinationTrendsHeading', 'Dose Activity Trends')}</h3>
             </div>
 
             {(!report?.trends || report.trends.length === 0) ? (
               <div className="py-8 text-center text-xs text-[#294B57]/70">
-                No trend data available.
+                {t('authority.emptyTrends', 'No trend data available.')}
               </div>
             ) : (
               <div className="space-y-3">
-                {report.trends.map((t, i) => {
-                  const pct = Math.round((t.completed_doses / maxTrend) * 100);
+                {report.trends.map((tItem, i) => {
+                  const pct = Math.round((tItem.completed_doses / maxTrend) * 100);
                   return (
                     <div key={i} className="space-y-1">
                       <div className="flex justify-between text-xs text-[#103342]">
-                        <span className="font-medium">{t.month}</span>
-                        <span className="font-bold">{t.completed_doses} doses</span>
+                        <span className="font-medium">{tItem.month}</span>
+                        <span className="font-bold">{tItem.completed_doses} {t('authority.doses', 'doses')}</span>
                       </div>
                       <div className="w-full bg-[#E5ECE5] rounded-full h-2 overflow-hidden">
                         <div
                           className="bg-[#007F68] h-2 rounded-full"
-                          style={{ width: `${Math.max(pct, t.completed_doses > 0 ? 5 : 0)}%` }}
+                          style={{ width: `${Math.max(pct, tItem.completed_doses > 0 ? 5 : 0)}%` }}
                         />
                       </div>
                     </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { backendApi } from '../../services/backendApi';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 
 export function AuthorityFollowUpsPage() {
+  const { t } = useLanguage();
   const [followUps, setFollowUps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -34,11 +36,11 @@ export function AuthorityFollowUpsPage() {
       const data = await backendApi.getSupervisorFollowUps();
       setFollowUps(data || []);
     } catch (err) {
-      setError(err.message || 'Failed to retrieve follow-up cases.');
+      setError(err.message || t('errors.serverError', 'Failed to retrieve follow-up cases.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchFollowUps();
@@ -73,8 +75,8 @@ export function AuthorityFollowUpsPage() {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
         <RefreshCw className="w-8 h-8 text-[#007F68] animate-spin mb-3" />
-        <p className="text-sm font-medium text-[#103342]">Loading follow-up cases...</p>
-        <p className="text-xs text-[#294B57]/70 mt-1">Checking overdue clinical milestones from database</p>
+        <p className="text-sm font-medium text-[#103342]">{t('common.loading', 'Loading follow-up cases...')}</p>
+        <p className="text-xs text-[#294B57]/70 mt-1">{t('authority.followUpsSub', 'Checking overdue clinical milestones from database')}</p>
       </div>
     );
   }
@@ -86,15 +88,15 @@ export function AuthorityFollowUpsPage() {
         <div>
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-6 h-6 text-[#007F68]" />
-            <h1 className="text-2xl font-bold text-[#103342]">Clinical Follow-Ups</h1>
+            <h1 className="text-2xl font-bold text-[#103342]">{t('authority.followUpsHeading', 'Clinical Follow-Ups')}</h1>
           </div>
           <p className="text-xs text-[#294B57]/80 mt-1">
-            Supervisory monitoring of high-priority cases, dropouts, and frontline worker follow-up actions
+            {t('authority.followUpsSub', 'Supervisory monitoring of high-priority cases, dropouts, and frontline worker follow-up actions')}
           </p>
         </div>
 
         <Button onClick={fetchFollowUps} variant="outline" size="sm" disabled={loading} className="text-xs self-start sm:self-auto">
-          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh Cases
+          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> {t('authority.refreshBtn', 'Refresh Cases')}
         </Button>
       </div>
 
@@ -102,7 +104,7 @@ export function AuthorityFollowUpsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-4 bg-white border border-[#D8E6DA] rounded-xl flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-[#294B57]/70 font-medium">Total Cases</span>
+            <span className="text-xs text-[#294B57]/70 font-medium">{t('common.total', 'Total Cases')}</span>
             <span className="text-xl font-bold text-[#103342] block mt-0.5">{followUps.length}</span>
           </div>
           <div className="w-9 h-9 rounded-xl bg-[#DDF0E3] text-[#007F68] flex items-center justify-center font-bold">
@@ -112,7 +114,7 @@ export function AuthorityFollowUpsPage() {
 
         <div className="p-4 bg-white border border-[#D8E6DA] rounded-xl flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-[#294B57]/70 font-medium">Pending Follow-ups</span>
+            <span className="text-xs text-[#294B57]/70 font-medium">{t('authority.pendingFollowups', 'Pending Follow-ups')}</span>
             <span className="text-xl font-bold text-[#B87D14] block mt-0.5">{pendingCount}</span>
           </div>
           <div className="w-9 h-9 rounded-xl bg-[#FEF9C3] text-[#A16207] flex items-center justify-center font-bold">
@@ -122,7 +124,7 @@ export function AuthorityFollowUpsPage() {
 
         <div className="p-4 bg-white border border-[#D8E6DA] rounded-xl flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-[#294B57]/70 font-medium">Overdue Cases</span>
+            <span className="text-xs text-[#294B57]/70 font-medium">{t('common.overdue', 'Overdue Cases')}</span>
             <span className="text-xl font-bold text-[#D9534F] block mt-0.5">{overdueCount}</span>
           </div>
           <div className="w-9 h-9 rounded-xl bg-[#FDECEC] text-[#D9534F] flex items-center justify-center font-bold">
@@ -139,7 +141,7 @@ export function AuthorityFollowUpsPage() {
             <p className="text-xs text-[#103342]">{error}</p>
           </div>
           <Button onClick={fetchFollowUps} variant="primary" size="sm" className="text-xs">
-            Retry
+            {t('common.retry', 'Retry')}
           </Button>
         </Card>
       )}
@@ -153,7 +155,7 @@ export function AuthorityFollowUpsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by child, worker name, or reason..."
+              placeholder={t('authority.searchPlaceholder', 'Search by child, worker name, or reason...')}
               className="w-full pl-10 pr-4 py-2 bg-white border border-[#D8E6DA] rounded-xl text-xs text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
             />
           </div>
@@ -165,10 +167,10 @@ export function AuthorityFollowUpsPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="bg-white border border-[#D8E6DA] rounded-xl px-3 py-2 text-xs text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
             >
-              <option value="ALL">All Follow-Up Statuses</option>
-              <option value="OVERDUE">Overdue Cases ({overdueCount})</option>
-              <option value="PENDING">Active Pending</option>
-              <option value="COMPLETED">Resolved / Completed</option>
+              <option value="ALL">{t('authority.filterAllStatuses', 'All Follow-Up Statuses')}</option>
+              <option value="OVERDUE">{t('status.overdue', 'Overdue Cases')} ({overdueCount})</option>
+              <option value="PENDING">{t('status.pending', 'Active Pending')}</option>
+              <option value="COMPLETED">{t('status.completed', 'Resolved / Completed')}</option>
             </select>
           </div>
         </div>
@@ -178,11 +180,11 @@ export function AuthorityFollowUpsPage() {
       {filteredFollowUps.length === 0 ? (
         <Card className="p-12 bg-[#FBF8F2] border-[#D8E6DA] text-center rounded-2xl">
           <CheckCircle2 className="w-12 h-12 text-[#007F68] mx-auto mb-3 opacity-80" />
-          <h3 className="text-base font-bold text-[#103342]">No Follow-Up Cases Found</h3>
+          <h3 className="text-base font-bold text-[#103342]">{t('authority.allOnTrack', 'No Follow-Up Cases Found')}</h3>
           <p className="text-xs text-[#294B57]/70 mt-1 max-w-sm mx-auto">
             {searchQuery || statusFilter !== 'ALL'
-              ? 'No cases match your active filter settings.'
-              : 'There are currently no active or overdue follow-up cases recorded in your jurisdiction.'}
+              ? t('authority.emptyAudit', 'No cases match your active filter settings.')
+              : t('authority.allOnTrack', 'There are currently no active or overdue follow-up cases recorded in your jurisdiction.')}
           </p>
         </Card>
       ) : (
@@ -191,13 +193,13 @@ export function AuthorityFollowUpsPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-[#EBF3ED] text-[#103342] border-b border-[#D8E6DA] font-semibold">
                 <tr>
-                  <th className="py-3 px-4">Patient / Child</th>
-                  <th className="py-3 px-4">Assigned Area</th>
-                  <th className="py-3 px-4">Assigned Worker</th>
-                  <th className="py-3 px-4">Due Date</th>
-                  <th className="py-3 px-4">Clinical Reason</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Action</th>
+                  <th className="py-3 px-4">{t('common.name', 'Patient / Child')}</th>
+                  <th className="py-3 px-4">{t('authority.villageArea', 'Assigned Area')}</th>
+                  <th className="py-3 px-4">{t('authority.assignedWorker', 'Assigned Worker')}</th>
+                  <th className="py-3 px-4">{t('common.dueDate', 'Due Date')}</th>
+                  <th className="py-3 px-4">{t('common.notes', 'Clinical Reason')}</th>
+                  <th className="py-3 px-4 text-center">{t('common.status', 'Status')}</th>
+                  <th className="py-3 px-4 text-right">{t('common.action', 'Action')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D8E6DA]/60">
@@ -206,19 +208,19 @@ export function AuthorityFollowUpsPage() {
                     <td className="py-3.5 px-4 font-bold text-[#103342]">
                       {fu.child_name}
                       <span className="block text-[10px] text-[#294B57]/70 font-normal">
-                        Child #{fu.child_id}
+                        #{fu.child_id}
                       </span>
                     </td>
 
                     <td className="py-3.5 px-4 text-[#294B57] whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-[#007F68]" />
-                        <span>{fu.village || 'N/A'}</span>
+                        <span>{fu.village || '—'}</span>
                       </div>
                     </td>
 
                     <td className="py-3.5 px-4 font-semibold text-[#103342] whitespace-nowrap">
-                      {fu.assigned_worker_name || 'Unassigned'}
+                      {fu.assigned_worker_name || t('authority.unassigned', 'Unassigned')}
                     </td>
 
                     <td className="py-3.5 px-4 whitespace-nowrap">
@@ -245,14 +247,14 @@ export function AuthorityFollowUpsPage() {
                         }
                         size="sm"
                       >
-                        {fu.is_overdue ? 'Overdue' : fu.status}
+                        {fu.is_overdue ? t('status.overdue', 'Overdue') : fu.status}
                       </Badge>
                     </td>
 
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <Link to={`/supervisor/children/${fu.child_id}`}>
                         <Button variant="outline" size="sm" className="text-xs">
-                          Inspect <ExternalLink className="w-3 h-3 ml-1" />
+                          {t('authority.inspect', 'Inspect')} <ExternalLink className="w-3 h-3 ml-1" />
                         </Button>
                       </Link>
                     </td>

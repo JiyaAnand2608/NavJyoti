@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { backendApi } from '../../services/backendApi';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 
 export function AuthorityWorkersPage() {
+  const { t } = useLanguage();
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,11 +37,11 @@ export function AuthorityWorkersPage() {
       const data = await backendApi.getSupervisorWorkers();
       setWorkers(data || []);
     } catch (err) {
-      setError(err.message || 'Failed to load healthcare workers list.');
+      setError(err.message || t('errors.connectionFailed', 'Failed to load healthcare workers list.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchWorkers();
@@ -56,11 +58,12 @@ export function AuthorityWorkersPage() {
 
   const filteredWorkers = useMemo(() => {
     return workers.filter((w) => {
+      const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
-        searchQuery === '' ||
-        w.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (w.worker_id && w.worker_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (w.email && w.email.toLowerCase().includes(searchQuery.toLowerCase()));
+        !q ||
+        w.name.toLowerCase().includes(q) ||
+        (w.worker_id && w.worker_id.toLowerCase().includes(q)) ||
+        (w.email && w.email.toLowerCase().includes(q));
 
       const matchesVillage =
         villageFilter === 'ALL' ||
@@ -75,8 +78,8 @@ export function AuthorityWorkersPage() {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
         <RefreshCw className="w-8 h-8 text-[#007F68] animate-spin mb-3" />
-        <p className="text-sm font-medium text-[#103342]">Loading healthcare workers...</p>
-        <p className="text-xs text-[#294B57]/70 mt-1">Fetching jurisdiction roster from database</p>
+        <p className="text-sm font-medium text-[#103342]">{t('common.loading', 'Loading healthcare workers...')}</p>
+        <p className="text-xs text-[#294B57]/70 mt-1">{t('authority.workersSub', 'Fetching jurisdiction roster from database')}</p>
       </div>
     );
   }
@@ -88,15 +91,24 @@ export function AuthorityWorkersPage() {
         <div>
           <div className="flex items-center gap-2">
             <Users className="w-6 h-6 text-[#007F68]" />
-            <h1 className="text-2xl font-bold text-[#103342]">Healthcare Workers</h1>
+            <h1 className="text-2xl font-bold text-[#103342] font-serif">
+              {t('authority.workersHeading', 'Healthcare Workers Roster')}
+            </h1>
           </div>
           <p className="text-xs text-[#294B57]/80 mt-1">
-            Frontline ANMs and ASHAs operating within your assigned jurisdiction
+            {t('authority.workersSub', 'Frontline ANMs and ASHAs operating within your assigned jurisdiction')}
           </p>
         </div>
 
-        <Button onClick={fetchWorkers} variant="outline" size="sm" disabled={loading} className="text-xs self-start sm:self-auto">
-          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh Roster
+        <Button
+          onClick={fetchWorkers}
+          variant="outline"
+          size="sm"
+          disabled={loading}
+          className="text-xs self-start sm:self-auto cursor-pointer"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+          {t('authority.refreshBtn', 'Refresh Roster')}
         </Button>
       </div>
 
@@ -107,8 +119,8 @@ export function AuthorityWorkersPage() {
             <AlertCircle className="w-5 h-5 text-[#D9534F] shrink-0" />
             <p className="text-xs text-[#103342]">{error}</p>
           </div>
-          <Button onClick={fetchWorkers} variant="primary" size="sm" className="text-xs">
-            Retry
+          <Button onClick={fetchWorkers} variant="primary" size="sm" className="text-xs cursor-pointer">
+            {t('authority.retry', 'Retry')}
           </Button>
         </Card>
       )}
@@ -121,7 +133,7 @@ export function AuthorityWorkersPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by worker name, staff ID, or email..."
+            placeholder={t('authority.searchPlaceholder', 'Search by worker name, staff ID, or email...')}
             className="w-full pl-10 pr-4 py-2 bg-white border border-[#D8E6DA] rounded-xl text-xs text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
           />
         </div>
@@ -134,7 +146,7 @@ export function AuthorityWorkersPage() {
               onChange={(e) => setVillageFilter(e.target.value)}
               className="bg-white border border-[#D8E6DA] rounded-xl px-3 py-2 text-xs text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
             >
-              <option value="ALL">All Villages / Areas</option>
+              <option value="ALL">{t('authority.filterAllVillages', 'All Villages / Areas')}</option>
               {uniqueVillages.map((v) => (
                 <option key={v} value={v}>
                   {v}
@@ -149,7 +161,9 @@ export function AuthorityWorkersPage() {
       {filteredWorkers.length === 0 ? (
         <Card className="p-12 bg-[#FBF8F2] border-[#D8E6DA] text-center rounded-2xl">
           <Users className="w-12 h-12 text-[#294B57]/40 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-[#103342]">No Healthcare Workers Found</h3>
+          <h3 className="text-base font-bold text-[#103342]">
+            {t('authority.emptyWorkers', 'No healthcare workers found in this jurisdiction.')}
+          </h3>
           <p className="text-xs text-[#294B57]/70 mt-1 max-w-sm mx-auto">
             {searchQuery || villageFilter !== 'ALL'
               ? 'No workers match the current search filters. Try clearing your search query.'
@@ -240,8 +254,8 @@ export function AuthorityWorkersPage() {
 
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <Link to={`/supervisor/workers/${w.id}`}>
-                        <Button variant="outline" size="sm" className="text-xs">
-                          View Details <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                        <Button variant="outline" size="sm" className="text-xs cursor-pointer">
+                          {t('authority.view360', 'View 360° Profile')} <ChevronRight className="w-3.5 h-3.5 ml-1" />
                         </Button>
                       </Link>
                     </td>

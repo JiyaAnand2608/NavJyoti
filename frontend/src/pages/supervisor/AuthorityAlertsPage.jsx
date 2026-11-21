@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { backendApi } from '../../services/backendApi';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 
 export function AuthorityAlertsPage() {
+  const { t } = useLanguage();
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -32,11 +34,11 @@ export function AuthorityAlertsPage() {
       const data = await backendApi.getSupervisorAlerts();
       setAlerts(data || []);
     } catch (err) {
-      setError(err.message || 'Failed to retrieve operational alerts.');
+      setError(err.message || t('errors.serverError', 'Failed to retrieve operational alerts.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchAlerts();
@@ -54,8 +56,8 @@ export function AuthorityAlertsPage() {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
         <RefreshCw className="w-8 h-8 text-[#007F68] animate-spin mb-3" />
-        <p className="text-sm font-medium text-[#103342]">Scanning jurisdiction database for operational alerts...</p>
-        <p className="text-xs text-[#294B57]/70 mt-1">Analyzing overdue follow-ups, unresolved appointments, and priority cases</p>
+        <p className="text-sm font-medium text-[#103342]">{t('common.loading', 'Scanning jurisdiction database for operational alerts...')}</p>
+        <p className="text-xs text-[#294B57]/70 mt-1">{t('authority.alertsSub', 'Analyzing overdue follow-ups and priority cases')}</p>
       </div>
     );
   }
@@ -67,15 +69,15 @@ export function AuthorityAlertsPage() {
         <div>
           <div className="flex items-center gap-2">
             <Bell className="w-6 h-6 text-[#007F68]" />
-            <h1 className="text-2xl font-bold text-[#103342]">Operational Alerts</h1>
+            <h1 className="text-2xl font-bold text-[#103342]">{t('authority.alertsHeading', 'Operational Alerts')}</h1>
           </div>
           <p className="text-xs text-[#294B57]/80 mt-1">
-            Automated health alerts computed dynamically from real patient and worker records
+            {t('authority.alertsSub', 'Automated health alerts computed dynamically from real patient and worker records')}
           </p>
         </div>
 
         <Button onClick={fetchAlerts} variant="outline" size="sm" disabled={loading} className="text-xs self-start sm:self-auto">
-          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh Alerts
+          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> {t('authority.refreshBtn', 'Refresh Alerts')}
         </Button>
       </div>
 
@@ -83,7 +85,7 @@ export function AuthorityAlertsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-4 bg-white border border-[#D8E6DA] rounded-xl flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-[#294B57]/70 font-medium">Total Active Alerts</span>
+            <span className="text-xs text-[#294B57]/70 font-medium">{t('authority.activeAlerts', 'Total Active Alerts')}</span>
             <span className="text-xl font-bold text-[#103342] block mt-0.5">{alerts.length}</span>
           </div>
           <div className="w-9 h-9 rounded-xl bg-[#DDF0E3] text-[#007F68] flex items-center justify-center font-bold">
@@ -93,7 +95,7 @@ export function AuthorityAlertsPage() {
 
         <div className="p-4 bg-white border border-[#D8E6DA] rounded-xl flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-[#294B57]/70 font-medium">High Severity Flagged</span>
+            <span className="text-xs text-[#294B57]/70 font-medium">{t('authority.highSeverityFlagged', 'High Severity Flagged')}</span>
             <span className="text-xl font-bold text-[#D9534F] block mt-0.5">{highCount}</span>
           </div>
           <div className="w-9 h-9 rounded-xl bg-[#FDECEC] text-[#D9534F] flex items-center justify-center font-bold">
@@ -103,7 +105,7 @@ export function AuthorityAlertsPage() {
 
         <div className="p-4 bg-white border border-[#D8E6DA] rounded-xl flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-[#294B57]/70 font-medium">Medium Priority Attention</span>
+            <span className="text-xs text-[#294B57]/70 font-medium">{t('authority.mediumPriorityAttention', 'Medium Priority Attention')}</span>
             <span className="text-xl font-bold text-[#B87D14] block mt-0.5">{mediumCount}</span>
           </div>
           <div className="w-9 h-9 rounded-xl bg-[#FEF9C3] text-[#A16207] flex items-center justify-center font-bold">
@@ -120,7 +122,7 @@ export function AuthorityAlertsPage() {
             <p className="text-xs text-[#103342]">{error}</p>
           </div>
           <Button onClick={fetchAlerts} variant="primary" size="sm" className="text-xs">
-            Retry
+            {t('common.retry', 'Retry')}
           </Button>
         </Card>
       )}
@@ -129,17 +131,17 @@ export function AuthorityAlertsPage() {
       <Card className="p-3 bg-[#FBF8F2] border-[#D8E6DA] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-[#294B57]/60" />
-          <span className="text-xs font-semibold text-[#103342]">Filter Severity:</span>
+          <span className="text-xs font-semibold text-[#103342]">{t('common.filter', 'Filter Severity')}:</span>
         </div>
         <select
           value={severityFilter}
           onChange={(e) => setSeverityFilter(e.target.value)}
           className="bg-white border border-[#D8E6DA] rounded-xl px-3 py-1.5 text-xs text-[#103342] focus:outline-none focus:ring-2 focus:ring-[#007F68]"
         >
-          <option value="ALL">All Severities ({alerts.length})</option>
-          <option value="high">High Severity ({highCount})</option>
-          <option value="medium">Medium Priority ({mediumCount})</option>
-          <option value="low">Low Priority</option>
+          <option value="ALL">{t('authority.filterAllSeverities', 'All Severities')} ({alerts.length})</option>
+          <option value="high">{t('authority.highSeverity', 'High Severity')} ({highCount})</option>
+          <option value="medium">{t('authority.mediumSeverity', 'Medium Priority')} ({mediumCount})</option>
+          <option value="low">{t('authority.lowSeverity', 'Low Priority')}</option>
         </select>
       </Card>
 
@@ -147,9 +149,9 @@ export function AuthorityAlertsPage() {
       {filteredAlerts.length === 0 ? (
         <Card className="p-12 bg-[#FBF8F2] border-[#D8E6DA] text-center rounded-2xl">
           <CheckCircle2 className="w-12 h-12 text-[#007F68] mx-auto mb-3 opacity-80" />
-          <h3 className="text-base font-bold text-[#103342]">No Operational Alerts Detected</h3>
+          <h3 className="text-base font-bold text-[#103342]">{t('authority.emptyAlerts', 'No Operational Alerts Detected')}</h3>
           <p className="text-xs text-[#294B57]/70 mt-1 max-w-sm mx-auto">
-            All clinical follow-ups, scheduled appointments, and patient records within your jurisdiction are currently up to date.
+            {t('authority.emptyAlerts', 'All clinical follow-ups and patient records within your jurisdiction are currently up to date.')}
           </p>
         </Card>
       ) : (
@@ -200,7 +202,11 @@ export function AuthorityAlertsPage() {
                         }
                         size="sm"
                       >
-                        {alert.severity.toUpperCase()}
+                        {alert.severity === 'high'
+                          ? t('authority.highSeverity', 'HIGH')
+                          : alert.severity === 'medium'
+                          ? t('authority.mediumSeverity', 'MEDIUM')
+                          : t('authority.lowSeverity', 'LOW')}
                       </Badge>
                     </div>
                     <p className="text-xs text-[#294B57] mt-1">{alert.description}</p>
@@ -214,7 +220,7 @@ export function AuthorityAlertsPage() {
                 {alert.child_id && (
                   <Link to={`/supervisor/children/${alert.child_id}`} className="self-end sm:self-center">
                     <Button variant="outline" size="sm" className="text-xs">
-                      Inspect Record <ExternalLink className="w-3 h-3 ml-1" />
+                      {t('authority.inspect', 'Inspect Record')} <ExternalLink className="w-3 h-3 ml-1" />
                     </Button>
                   </Link>
                 )}

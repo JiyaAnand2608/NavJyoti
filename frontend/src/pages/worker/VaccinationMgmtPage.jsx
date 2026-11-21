@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { useHealthData } from '../../contexts/HealthDataContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useOffline } from '../../contexts/OfflineContext';
 import { Card, CardHeader } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
-import { Check, Syringe, CheckCircle2, AlertCircle, Filter, Calendar } from 'lucide-react';
+import { Check, Syringe, CheckCircle2, AlertCircle, Filter, Calendar, RefreshCw, UserCheck } from 'lucide-react';
 
 export function VaccinationMgmtPage() {
-  const { childrenList, administerDose } = useHealthData();
-  const [filterType, setFilterType] = useState('due_soon'); // 'all' | 'due_soon' | 'overdue'
+  const { user } = useAuth();
+  const { effectiveOffline } = useOffline();
+  const { childrenList, administerDose, refreshChildren } = useHealthData();
+  const [filterType, setFilterType] = useState('all'); // 'all' | 'due_soon' | 'overdue'
 
   // Modal State
   const [administerModalOpen, setAdministerModalOpen] = useState(false);
@@ -17,6 +21,7 @@ export function VaccinationMgmtPage() {
   const [site, setSite] = useState('Left upper arm');
   const [doseDate, setDoseDate] = useState(new Date().toISOString().split('T')[0]);
   const [doseNotes, setDoseNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -24,13 +29,19 @@ export function VaccinationMgmtPage() {
   const allPendingDoses = [];
   childrenList.forEach((child) => {
     child.doses?.forEach((dose) => {
-      if (dose.status === 'due_soon' || dose.status === 'overdue') {
+      const isCompleted = dose.status === 'administered' || Boolean(dose.dateAdministered);
+      if (!isCompleted) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const isOverdue = dose.status === 'overdue' || (dose.dueDate && dose.dueDate < todayStr);
+
         allPendingDoses.push({
           ...dose,
           childId: child.id,
           childName: child.name,
           village: child.village,
+          subCentre: child.subCentre,
           caregiverPhone: child.caregiverPhone,
+          computedStatus: isOverdue ? 'overdue' : 'due_soon',
         });
       }
     });
@@ -39,40 +50,60 @@ export function VaccinationMgmtPage() {
   const displayedDoses =
     filterType === 'all'
       ? allPendingDoses
-      : allPendingDoses.filter((d) => d.status === filterType);
+      : allPendingDoses.filter((d) => d.computedStatus === filterType);
 
   const handleOpenAdministerModal = (dose) => {
     setSelectedDose(dose);
     setErrorMsg('');
     setBatchNumber(`BATCH-2024-${Math.floor(100 + Math.random() * 900)}`);
     setDoseDate(new Date().toISOString().split('T')[0]);
+    setFacility(dose.subCentre || 'Rampur Sub-Centre');
     setDoseNotes('');
     setAdministerModalOpen(true);
   };
 
-  const handleConfirmAdminister = (e) => {
+  const handleConfirmAdminister = async (e) => {
     e.preventDefault();
     if (!selectedDose) return;
+
+    if (effectiveOffline) {
+      setErrorMsg('Offline Mode Active: Dose administration is disabled while disconnected to protect patient record integrity. Reconnect to server before recording doses.');
+      return;
+    }
 
     if (!batchNumber.trim()) {
       setErrorMsg('Please specify a valid UIP vaccine batch number before confirming administration.');
       return;
     }
+
+    if (doseDate > new Date().toISOString().split('T')[0]) {
+      setErrorMsg('Administration date cannot be in the future.');
+      return;
+    }
+
     setErrorMsg('');
+    setIsSubmitting(true);
 
-    administerDose(selectedDose.childId, selectedDose.vaccineId, {
-      vaccineName: selectedDose.vaccineName,
-      batch: batchNumber.trim(),
-      facility,
-      site,
-      dateAdministered: doseDate,
-      notes: doseNotes,
-      workerName: "Rekha Devi (ANM)",
-    });
+    try {
+      await administerDose(selectedDose.childId, selectedDose.vaccineId || selectedDose.id, {
+        vaccineName: selectedDose.vaccineName,
+        batch: batchNumber.trim(),
+        facility: facility.trim(),
+        site: site,
+        dateAdministered: doseDate,
+        notes: doseNotes.trim(),
+        workerName: user?.name || "Current ANM",
+      });
 
-    setAdministerModalOpen(false);
-    setSuccessMsg(`Vaccine dose "${selectedDose.vaccineName}" successfully recorded for ${selectedDose.childName}.`);
-    setTimeout(() => setSuccessMsg(''), 4500);
+      setAdministerModalOpen(false);
+      setSuccessMsg(`Vaccine dose "${selectedDose.vaccineName}" successfully recorded for ${selectedDose.childName}.`);
+      refreshChildren?.();
+      setTimeout(() => setSuccessMsg(''), 4500);
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to record dose administration.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -82,7 +113,7 @@ export function VaccinationMgmtPage() {
           <h1 className="text-2xl font-bold text-[#103342] font-serif">
             Vaccination Management & Session Drive
           </h1>
-          <p className="text-xs text-[#294B57]">
+          <p className="text-xs text-[#294B57] mt-0.5">
             Cohort immunisation queue for Village Health & Nutrition Day (VHND) sessions
           </p>
         </div>
@@ -90,7 +121,7 @@ export function VaccinationMgmtPage() {
         <div className="flex items-center gap-1.5 p-1 bg-[#FBF8F2] border border-[#D8E6DA] rounded-xl text-xs font-medium">
           <button
             onClick={() => setFilterType('all')}
-            className={`px-3 py-1.5 rounded-lg cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
               filterType === 'all' ? 'bg-[#103342] text-white font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
             }`}
           >
@@ -98,19 +129,19 @@ export function VaccinationMgmtPage() {
           </button>
           <button
             onClick={() => setFilterType('overdue')}
-            className={`px-3 py-1.5 rounded-lg cursor-pointer ${
-              filterType === 'overdue' ? 'bg-[#E57373] text-white font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
+            className={`px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
+              filterType === 'overdue' ? 'bg-[#D9534F] text-white font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
             }`}
           >
-            Overdue Catch-up ({allPendingDoses.filter(d => d.status === 'overdue').length})
+            Overdue Catch-up ({allPendingDoses.filter(d => d.computedStatus === 'overdue').length})
           </button>
           <button
             onClick={() => setFilterType('due_soon')}
-            className={`px-3 py-1.5 rounded-lg cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
               filterType === 'due_soon' ? 'bg-[#F4B83F] text-[#103342] font-semibold' : 'text-[#294B57] hover:bg-[#F0EBE1]'
             }`}
           >
-            Due in 7–14 Days ({allPendingDoses.filter(d => d.status === 'due_soon').length})
+            Due in 7–14 Days ({allPendingDoses.filter(d => d.computedStatus === 'due_soon').length})
           </button>
         </div>
       </div>
@@ -147,7 +178,7 @@ export function VaccinationMgmtPage() {
               </thead>
               <tbody className="divide-y divide-[#D8E6DA]/70 text-[#294B57]">
                 {displayedDoses.map((dose) => (
-                  <tr key={`${dose.childId}_${dose.vaccineId}`} className="hover:bg-[#F0EBE1]/40 transition-colors">
+                  <tr key={`${dose.childId}_${dose.id || dose.vaccineId}`} className="hover:bg-[#F0EBE1]/40 transition-colors">
                     <td className="py-3 px-4">
                       <span className="font-bold text-[#103342] block">{dose.childName}</span>
                       <span className="text-[10px] text-[#007F68] font-mono font-semibold">{dose.childId}</span>
@@ -159,7 +190,7 @@ export function VaccinationMgmtPage() {
                     <td className="py-3 px-3 font-mono text-[#294B57]">{dose.caregiverPhone}</td>
                     <td className="py-3 px-3 font-mono">{dose.dueDate || 'Session Due'}</td>
                     <td className="py-3 px-3">
-                      {dose.status === 'overdue' ? (
+                      {dose.computedStatus === 'overdue' ? (
                         <Badge variant="overdue">Overdue</Badge>
                       ) : (
                         <Badge variant="dueSoon">Due Soon</Badge>
@@ -186,14 +217,21 @@ export function VaccinationMgmtPage() {
       {administerModalOpen && selectedDose && (
         <Modal
           isOpen={administerModalOpen}
-          onClose={() => setAdministerModalOpen(false)}
+          onClose={() => setIsAdministerModalOpen(false)}
           title={`Confirm Administration: ${selectedDose.vaccineName}`}
           subtitle={`Child: ${selectedDose.childName} (${selectedDose.childId})`}
         >
           <form onSubmit={handleConfirmAdminister} className="space-y-4 text-xs text-[#294B57]">
             {errorMsg && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
-                {errorMsg}
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+            {effectiveOffline && (
+              <div className="p-3 rounded-xl bg-[#FDF8EF] border border-[#F4B83F]/50 text-[#B87D14] flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Read-Only Offline View: Dose recording is disabled until server reconnection is established.</span>
               </div>
             )}
             <div className="p-3 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-[#005F52]">
@@ -202,17 +240,7 @@ export function VaccinationMgmtPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block font-semibold text-[#103342] mb-1">Date Administered</label>
-                <input
-                  type="date"
-                  required
-                  value={doseDate}
-                  onChange={(e) => setDoseDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-[#103342] mb-1">Vaccine Batch ID *</label>
+                <label className="block font-semibold text-[#103342] mb-1">Batch Number *</label>
                 <input
                   type="text"
                   required
@@ -221,11 +249,22 @@ export function VaccinationMgmtPage() {
                   className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342] font-mono"
                 />
               </div>
+              <div>
+                <label className="block font-semibold text-[#103342] mb-1">Date Administered *</label>
+                <input
+                  type="date"
+                  required
+                  max={new Date().toISOString().split('T')[0]}
+                  value={doseDate}
+                  onChange={(e) => setDoseDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block font-semibold text-[#103342] mb-1">Facility Name</label>
+                <label className="block font-semibold text-[#103342] mb-1">Facility Name *</label>
                 <input
                   type="text"
                   required
@@ -235,7 +274,7 @@ export function VaccinationMgmtPage() {
                 />
               </div>
               <div>
-                <label className="block font-semibold text-[#103342] mb-1">Anatomical Site</label>
+                <label className="block font-semibold text-[#103342] mb-1">Administration Site</label>
                 <select
                   value={site}
                   onChange={(e) => setSite(e.target.value)}
@@ -250,12 +289,22 @@ export function VaccinationMgmtPage() {
             </div>
 
             <div>
-              <label className="block font-semibold text-[#103342] mb-1">Notes / Observations</label>
+              <label className="block font-semibold text-[#103342] mb-1">Administering Worker Session</label>
+              <input
+                type="text"
+                disabled
+                value={user?.name ? `${user.name} (Health Worker)` : 'Authenticated ANM Session'}
+                className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-slate-100 text-[#103342]"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold text-[#103342] mb-1">Notes (Optional)</label>
               <input
                 type="text"
                 value={doseNotes}
                 onChange={(e) => setDoseNotes(e.target.value)}
-                placeholder="e.g. Session dose verified, mother counseled..."
+                placeholder="Caregiver counselled on minor fever reactions..."
                 className="w-full px-3 py-2 rounded-xl border border-[#D8E6DA] bg-white text-[#103342]"
               />
             </div>
@@ -263,16 +312,19 @@ export function VaccinationMgmtPage() {
             <div className="pt-2 flex justify-end gap-2">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => setAdministerModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-white border border-[#D8E6DA] text-[#103342] font-semibold text-xs cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-white border border-[#D8E6DA] text-[#103342] font-semibold text-xs cursor-pointer hover:bg-[#F0EBE1]"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs"
+                disabled={isSubmitting || effectiveOffline}
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs disabled:opacity-50"
               >
-                Commit Dose Entry
+                {isSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isSubmitting ? 'Recording...' : effectiveOffline ? 'Disabled (Offline)' : 'Confirm Administration'}</span>
               </button>
             </div>
           </form>

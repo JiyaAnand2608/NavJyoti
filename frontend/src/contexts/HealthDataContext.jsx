@@ -7,6 +7,7 @@ import React, {
   useCallback,
 } from 'react';
 import { useAuth } from './AuthContext';
+import { useOffline } from './OfflineContext';
 import { backendApi } from '../services/backendApi';
 import { getLastSelectedChildId, setLastSelectedChildId } from '../services/storage';
 import { INITIAL_CHILDREN } from '../data/mockChildren';
@@ -98,6 +99,7 @@ function formatAppointment(a) {
 
 export function HealthDataProvider({ children }) {
   const { user, isLoading: authLoading, isSimulated } = useAuth();
+  const { recordSuccessfulSync, updateSessionCache, clearSessionCache, effectiveOffline } = useOffline();
   const [allChildren, setAllChildren] = useState([]);
   const [childrenLoading, setChildrenLoading] = useState(true);
   const [childrenError, setChildrenError] = useState(null);
@@ -123,6 +125,7 @@ export function HealthDataProvider({ children }) {
         setAllChildren([]);
         setAppointments([]);
         setChildrenLoading(false);
+        clearSessionCache();
         return;
       }
 
@@ -232,6 +235,8 @@ export function HealthDataProvider({ children }) {
           setNotifications(notifList || []);
           setCommunications(commList || []);
           setFollowUps(followList || []);
+          recordSuccessfulSync();
+          updateSessionCache(user.id, detailed);
         }
       } catch (error) {
         console.warn('Backend query failed, falling back to offline demonstration fixtures:', error.message);

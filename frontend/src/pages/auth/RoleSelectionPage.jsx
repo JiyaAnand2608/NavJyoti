@@ -1,12 +1,10 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Baby, Users, ShieldCheck, ArrowRight, Building } from 'lucide-react';
 import { SimulationBadge } from '../../components/common/SimulationBadge';
 
 export function RoleSelectionPage() {
-  const { switchRole, loginWithDemo } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -111,7 +109,7 @@ export function RoleSelectionPage() {
                 <Building className="w-7 h-7" />
               </div>
               <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-xl font-bold text-[#103342]">Supervisor / MOIC</h3>
+                <h3 className="text-xl font-bold text-[#103342]">Authority / MOIC</h3>
                 <span className="px-2 py-0.5 rounded-full bg-[#DDF0E3] text-[#007F68] text-[10px] font-semibold">
                   Authority
                 </span>
@@ -122,7 +120,7 @@ export function RoleSelectionPage() {
             </div>
 
             <div className="mt-6 pt-4 border-t border-[#D8E6DA]/70 flex items-center justify-between text-xs font-bold text-[#007F68]">
-              <span>Enter Supervisor Analytics</span>
+              <span>Enter Authority Portal</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
           </div>

@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Card } from '../../components/common/Card';
 import { SimulationBanner } from '../../components/common/SimulationBadge';
 
@@ -51,6 +51,7 @@ function MetricCard({ label, value, description, icon: Icon }) {
 
 export function SupervisorAnalyticsPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -80,7 +81,6 @@ export function SupervisorAnalyticsPage() {
         const token = sessionStorage.getItem(TOKEN_KEY);
 
         if (!token || user?.isSimulated) {
-          // Development / Database Deferred Mode: load labeled mock analytics
           if (!signal?.aborted) {
             setStats(MOCK_SUPERVISOR_STATS);
           }
@@ -138,7 +138,6 @@ export function SupervisorAnalyticsPage() {
 
         console.warn('Backend supervisor query failed, falling back to development analytics fixtures:', err.message);
         if (!signal?.aborted) {
-          // Graceful fallback to demonstration analytics
           setStats(MOCK_SUPERVISOR_STATS);
         }
       } finally {
@@ -205,11 +204,11 @@ export function SupervisorAnalyticsPage() {
         <ShieldCheck className="w-10 h-10 mx-auto text-[#007F68] mb-3" />
 
         <h2 className="font-bold text-[#103342]">
-          Supervisor Access Required
+          {t('errors.accessDenied', 'Supervisor Access Required')}
         </h2>
 
         <p className="text-xs text-[#294B57] mt-2">
-          Sign in with an authorized Supervisor account.
+          {t('auth.supervisorDesc', 'Sign in with an authorized Supervisor account.')}
         </p>
       </div>
     );
@@ -222,16 +221,15 @@ export function SupervisorAnalyticsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="inline-block px-3 py-1 mb-3 rounded-full bg-[#DDF0E3] border border-[#D8E6DA] text-[10px] text-[#007F68] font-bold uppercase tracking-wider">
-            Supervisor Portal
+            {t('sidebar.supervisorRole', 'Authority Portal')}
           </span>
 
           <h1 className="text-2xl sm:text-3xl font-bold text-[#103342] font-serif">
-            Supervisor & Health Authority Analytics
+            {t('authority.reportsHeading', 'Supervisor & Health Authority Analytics')}
           </h1>
 
           <p className="text-xs sm:text-sm text-[#294B57] mt-2">
-            Aggregate health records retrieved from NavJyoti's
-            FastAPI and PostgreSQL backend.
+            {t('authority.reportsSub', "Aggregate health records retrieved from NavJyoti's backend.")}
           </p>
         </div>
 
@@ -240,30 +238,30 @@ export function SupervisorAnalyticsPage() {
             type="button"
             onClick={() => loadAnalytics()}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-[#D8E6DA] text-[#007F68] text-xs font-semibold hover:bg-[#F0EBE1] disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-[#D8E6DA] text-[#007F68] text-xs font-semibold hover:bg-[#F0EBE1] disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw
               className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
             />
-            Refresh
+            {t('common.refresh', 'Refresh')}
           </button>
 
           <button
             type="button"
             onClick={handleExportCSV}
             disabled={!stats || loading}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#007F68] text-white text-xs font-semibold hover:bg-[#005F52] disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#007F68] text-white text-xs font-semibold hover:bg-[#005F52] disabled:opacity-50 cursor-pointer"
           >
             <Download className="w-4 h-4" />
-            Export Aggregate CSV
+            {t('authority.exportCsvBtn', 'Export Aggregate CSV')}
           </button>
         </div>
       </div>
 
       {stats?.isSimulated && (
         <SimulationBanner
-          title="Database Deferred Demonstration Mode"
-          message="PostgreSQL migration is deferred for another teammate. Displaying aggregate metrics from development fixtures. When PostgreSQL is connected, metrics query real database aggregates automatically."
+          title={t('common.simulatedFeature', 'Demonstration Mode')}
+          message="Displaying aggregate metrics from development fixtures. When connected to PostgreSQL, queries real database aggregates automatically."
         />
       )}
 
@@ -272,11 +270,8 @@ export function SupervisorAnalyticsPage() {
         <ShieldCheck className="w-5 h-5 shrink-0" />
 
         <p>
-          <strong>Aggregate reporting:</strong> This page displays
-          overall counts without listing children's names or medical
-          histories. Access permissions are checked by FastAPI.
-          This prototype has not yet undergone a formal privacy or
-          regulatory compliance audit.
+          <strong>{t('authority.roleBoundariesTitle', 'Aggregate reporting')}:</strong> This page displays
+          overall counts without listing children's medical histories. Access permissions are verified by role.
         </p>
       </div>
 
@@ -294,7 +289,7 @@ export function SupervisorAnalyticsPage() {
       {/* LOADING */}
       {loading && (
         <div className="p-5 bg-[#FBF8F2] rounded-2xl border border-[#D8E6DA] text-xs">
-          Loading PostgreSQL analytics...
+          {t('common.loading', 'Loading analytics...')}
         </div>
       )}
 
@@ -304,44 +299,44 @@ export function SupervisorAnalyticsPage() {
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
 
             <MetricCard
-              label="Registered Children"
+              label={t('authority.registeredChildren', 'Registered Children')}
               value={stats.total_children}
-              description="Total children in the database"
+              description={t('authority.registeredChildrenSub', 'Total children in database')}
               icon={Users}
             />
 
             <MetricCard
-              label="Health Workers"
+              label={t('authority.supervisedWorkers', 'Health Workers')}
               value={stats.total_workers}
-              description="Registered worker accounts"
+              description={t('authority.supervisedWorkersSub', 'Registered worker accounts')}
               icon={UserRoundCheck}
             />
 
             <MetricCard
-              label="Vaccination Records"
+              label={t('authority.totalScheduled', 'Vaccination Records')}
               value={stats.total_vaccinations}
-              description="Stored vaccine records, not schedule coverage"
+              description={t('authority.vaccinationSub', 'Stored vaccine records')}
               icon={Syringe}
             />
 
             <MetricCard
-              label="Completed Vaccination Records"
+              label={t('authority.completedDoses', 'Completed Doses')}
               value={stats.completed_vaccinations}
-              description="Records marked administered"
+              description={t('authority.completedDosesSub', 'Records marked administered')}
               icon={ShieldCheck}
             />
 
             <MetricCard
-              label="Pending Follow-Ups"
+              label={t('authority.pendingFollowups', 'Pending Follow-Ups')}
               value={stats.pending_followups}
-              description="Follow-up tasks marked pending"
+              description={t('authority.pendingFollowupsSub', 'Follow-up tasks marked pending')}
               icon={ClipboardCheck}
             />
 
             <MetricCard
-              label="Upcoming Appointments"
+              label={t('sidebar.appointments', 'Upcoming Appointments')}
               value={stats.upcoming_appointments}
-              description="Future requested, approved, or rescheduled visits"
+              description={t('sidebar.appointments', 'Scheduled visits')}
               icon={CalendarCheck}
             />
 
@@ -351,11 +346,11 @@ export function SupervisorAnalyticsPage() {
           <Card className="bg-[#FBF8F2] border-[#D8E6DA] overflow-hidden">
             <div className="p-5 border-b border-[#D8E6DA]">
               <h2 className="font-bold text-sm text-[#103342] font-serif">
-                Database Record Summary
+                {t('authority.reportsHeading', 'Database Record Summary')}
               </h2>
 
               <p className="text-xs text-[#294B57] mt-1">
-                Current aggregate totals from the Supervisor API.
+                {t('authority.reportsSub', 'Current aggregate totals from the Supervisor API.')}
               </p>
             </div>
 
@@ -363,19 +358,19 @@ export function SupervisorAnalyticsPage() {
               <table className="w-full text-xs text-left">
                 <thead className="bg-[#F0EBE1] text-[#294B57] uppercase">
                   <tr>
-                    <th className="px-5 py-3">Metric</th>
-                    <th className="px-5 py-3 text-right">Total</th>
+                    <th className="px-5 py-3">{t('common.status', 'Metric')}</th>
+                    <th className="px-5 py-3 text-right">{t('common.total', 'Total')}</th>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-[#D8E6DA]">
                   {[
-                    ['Children registered', stats.total_children],
-                    ['Health workers registered', stats.total_workers],
-                    ['Vaccination records', stats.total_vaccinations],
-                    ['Completed vaccine records', stats.completed_vaccinations],
-                    ['Pending follow-ups', stats.pending_followups],
-                    ['Upcoming appointments', stats.upcoming_appointments],
+                    [t('authority.registeredChildren', 'Children registered'), stats.total_children],
+                    [t('authority.supervisedWorkers', 'Health workers registered'), stats.total_workers],
+                    [t('authority.totalScheduled', 'Vaccination records'), stats.total_vaccinations],
+                    [t('authority.completedDoses', 'Completed vaccine records'), stats.completed_vaccinations],
+                    [t('authority.pendingFollowups', 'Pending follow-ups'), stats.pending_followups],
+                    [t('sidebar.appointments', 'Upcoming appointments'), stats.upcoming_appointments],
                   ].map(([label, value]) => (
                     <tr key={label}>
                       <td className="px-5 py-3">{label}</td>
@@ -388,43 +383,11 @@ export function SupervisorAnalyticsPage() {
               </table>
             </div>
           </Card>
-
-          {/* LIMITATIONS */}
-          <Card className="p-5 bg-[#FBF8F2] border-[#D8E6DA]">
-            <div className="flex items-start gap-3">
-              <Activity className="w-5 h-5 text-[#007F68] shrink-0" />
-
-              <div>
-                <h2 className="font-bold text-sm text-[#103342]">
-                  Reporting Scope
-                </h2>
-
-                <p className="text-xs text-[#294B57] mt-2 leading-relaxed">
-                  These counts come from the database. They do not
-                  establish vaccination coverage, clinical risk,
-                  missed doses, or immunisation completion for
-                  individual children.
-                </p>
-
-                <p className="text-xs text-[#294B57] mt-2 leading-relaxed">
-                  Verified village-level comparisons and worker
-                  workload breakdowns require additional backend
-                  aggregate reporting endpoints.
-                </p>
-              </div>
-            </div>
-          </Card>
         </>
       )}
 
-      {!loading && !stats && !error && (
-        <p className="text-xs text-[#294B57]">
-          No analytics data is available.
-        </p>
-      )}
-
       <p className="text-[11px] text-[#294B57]/70">
-        NavJyoti hackathon prototype — use fictional test records only.
+        {t('common.healthcareDisclaimer', 'Healthcare Support Prototype — Not a diagnostic medical device.')}
       </p>
     </div>
   );

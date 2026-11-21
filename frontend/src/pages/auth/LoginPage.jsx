@@ -22,6 +22,9 @@ import {
 
 export function LoginPage() {
   const {
+    user,
+    isAuthenticated,
+    isLoading,
     loginParent,
     requestWorkerOtp,
     verifyWorkerOtp,
@@ -34,10 +37,44 @@ export function LoginPage() {
 
   const searchParams = new URLSearchParams(location.search);
   const queryRole = searchParams.get('role');
-  const intendedDestination = location.state?.from || null;
   const initialRole = location.state?.role || queryRole || 'parent';
 
   const [selectedRole, setSelectedRole] = useState(initialRole);
+
+  // Helper to extract clean path string from state or location
+  const extractPath = (dest) => {
+    if (!dest) return null;
+    if (typeof dest === 'string') return dest;
+    if (typeof dest === 'object' && dest.pathname) return dest.pathname;
+    return null;
+  };
+
+  const dashboardPaths = {
+    parent: '/parent/dashboard',
+    worker: '/worker/dashboard',
+    supervisor: '/supervisor/dashboard',
+  };
+
+  // Safe role-based redirect ensuring strict isolation
+  const navigateToRoleDashboard = (userRole) => {
+    const defaultHome = dashboardPaths[userRole] || '/parent/dashboard';
+    const dest = extractPath(location.state?.from);
+    if (dest && dest.startsWith(`/${userRole}`)) {
+      navigate(dest, { replace: true });
+    } else {
+      navigate(defaultHome, { replace: true });
+    }
+  };
+
+  // If already authenticated and no distinct role requested, redirect to dashboard
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user?.role) {
+      const requestedRole = location.state?.role || queryRole;
+      if (!requestedRole || requestedRole === user.role) {
+        navigateToRoleDashboard(user.role);
+      }
+    }
+  }, [isLoading, isAuthenticated, user, location.state, queryRole]);
 
   // Parent Credentials State
   const [phone, setPhone] = useState('');
@@ -54,12 +91,6 @@ export function LoginPage() {
 
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const dashboardPaths = {
-    parent: '/parent/dashboard',
-    worker: '/worker/dashboard',
-    supervisor: '/supervisor/dashboard',
-  };
 
   // Sync selected role when query params or navigation state change
   useEffect(() => {
@@ -118,14 +149,8 @@ export function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const user = await loginParent(phone.trim(), password);
-
-      let dest = intendedDestination;
-      if (dest && dest.startsWith('/parent')) {
-        navigate(dest, { replace: true });
-      } else {
-        navigate('/parent/dashboard', { replace: true });
-      }
+      const authedUser = await loginParent(phone.trim(), password);
+      navigateToRoleDashboard(authedUser?.role || 'parent');
     } catch (error) {
       setErrorMsg(error.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -171,15 +196,8 @@ export function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const user = await verifyWorkerOtp(email.trim(), selectedRole, otp.trim());
-
-      const targetPath = selectedRole === 'supervisor' ? '/supervisor/dashboard' : '/worker/dashboard';
-      let dest = intendedDestination;
-      if (dest && (dest.startsWith('/worker') || dest.startsWith('/supervisor'))) {
-        navigate(dest, { replace: true });
-      } else {
-        navigate(targetPath, { replace: true });
-      }
+      const authedUser = await verifyWorkerOtp(email.trim(), selectedRole, otp.trim());
+      navigateToRoleDashboard(authedUser?.role || selectedRole);
     } catch (error) {
       setErrorMsg(error.message || 'Verification failed. Please check the code.');
     } finally {
@@ -200,15 +218,14 @@ export function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const user = await loginWithPassword(email.trim(), password);
+      const authedUser = await loginWithPassword(email.trim(), password);
 
-      if (user.role !== selectedRole) {
+      if (authedUser.role !== selectedRole) {
         logout();
-        throw new Error(`This account belongs to the ${user.role} role. Please select the correct portal.`);
+        throw new Error(`This account belongs to the ${authedUser.role} role. Please select the correct portal.`);
       }
 
-      const targetPath = selectedRole === 'supervisor' ? '/supervisor/dashboard' : '/worker/dashboard';
-      navigate(targetPath, { replace: true });
+      navigateToRoleDashboard(authedUser.role);
     } catch (error) {
       setErrorMsg(error.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -222,8 +239,7 @@ export function LoginPage() {
     setErrorMsg('');
     try {
       const demoUser = await loginWithDemo(role);
-      const targetPath = dashboardPaths[demoUser.role] || '/parent/dashboard';
-      navigate(targetPath, { replace: true });
+      navigateToRoleDashboard(demoUser?.role || role);
     } catch (error) {
       setErrorMsg(error.message || 'Demo login failed. Please check connection.');
     } finally {
@@ -311,7 +327,7 @@ export function LoginPage() {
               }`}
             >
               <Building className="w-3.5 h-3.5" />
-              Supervisor
+              Authority
             </button>
           </div>
 
@@ -322,7 +338,7 @@ export function LoginPage() {
                 ? 'Caregiver Sign In'
                 : selectedRole === 'worker'
                 ? 'Health Worker Sign In'
-                : 'Medical Officer Sign In'}
+                : 'Authority / Medical Officer Sign In'}
             </h1>
             <p className="text-xs text-[#294B57] mt-1">
               {selectedRole === 'parent'
@@ -671,7 +687,7 @@ export function LoginPage() {
                         <span>
                           {selectedRole === 'worker'
                             ? 'Sign In as Health Worker'
-                            : 'Sign In as Supervisor'}
+                            : 'Sign In as Authority'}
                         </span>
                         <ArrowRight className="w-4 h-4" />
                       </>
@@ -690,7 +706,7 @@ export function LoginPage() {
               className="w-full py-2.5 px-3 rounded-xl bg-[#F0EBE1] hover:bg-[#E8E2D5] text-[#103342] text-xs font-semibold border border-[#D8E6DA] flex items-center justify-center gap-2 cursor-pointer transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5 text-[#007F68]" />
-              <span>1-Click Demo Access ({selectedRole === 'parent' ? 'Caregiver' : selectedRole === 'worker' ? 'ANM Worker' : 'Supervisor'})</span>
+              <span>1-Click Demo Access ({selectedRole === 'parent' ? 'Caregiver' : selectedRole === 'worker' ? 'ANM Worker' : 'Authority (MOIC)'})</span>
             </button>
           </div>
 
