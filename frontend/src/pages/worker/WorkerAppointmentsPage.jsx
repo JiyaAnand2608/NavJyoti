@@ -421,13 +421,13 @@ export function WorkerAppointmentsPage() {
                           onClick={() =>
                             handleUpdateStatus(
                               appointment,
-                              'rejected'
+                              'cancelled'
                             )
                           }
                           className="px-3 py-2 rounded-full bg-red-50 text-red-700 font-semibold text-xs hover:bg-red-100 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                         >
                           <X className="w-4 h-4" />
-                          Reject
+                          Decline
                         </button>
                       </>
                     )}

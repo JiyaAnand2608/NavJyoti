@@ -114,7 +114,7 @@ export function TopHeader({ onOpenMobileNav }) {
         </button>
 
         {/* Role context details */}
-        {!isWorker ? (
+        {isParent ? (
           childrenList && childrenList.length > 0 ? (
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#DDF0E3] border border-[#D8E6DA] text-xs sm:text-[13px]">
@@ -145,7 +145,7 @@ export function TopHeader({ onOpenMobileNav }) {
           ) : (
             <span className="text-[13px] text-[#294B57] font-medium">No child linked yet</span>
           )
-        ) : (
+        ) : isWorker ? (
           /* Health Worker Sub-centre badge */
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-xs sm:text-[13px]">
@@ -158,7 +158,7 @@ export function TopHeader({ onOpenMobileNav }) {
               <span className="text-[#294B57] font-medium">{user?.jurisdiction?.phc || "Bilaspur PHC"}</span>
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* SUPERVISOR */}
         {isSupervisor && (

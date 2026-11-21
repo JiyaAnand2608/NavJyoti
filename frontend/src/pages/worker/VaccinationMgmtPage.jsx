@@ -5,6 +5,25 @@ import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { Check, Syringe, CheckCircle2, AlertCircle, Filter, Calendar } from 'lucide-react';
 
+function getDoseStatus(dose) {
+  if (dose.status === 'overdue' || dose.status === 'due_soon') {
+    return dose.status;
+  }
+
+  if (!dose.dueDate) return 'scheduled';
+
+  const dueDate = new Date(`${String(dose.dueDate).slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(dueDate.getTime())) return 'scheduled';
+
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysUntilDue = Math.floor((dueDate.getTime() - today) / 86400000);
+
+  if (daysUntilDue < 0) return 'overdue';
+  if (daysUntilDue >= 7 && daysUntilDue <= 14) return 'due_soon';
+  return 'scheduled';
+}
+
 export function VaccinationMgmtPage() {
   const { childrenList, administerDose } = useHealthData();
   const [filterType, setFilterType] = useState('due_soon'); // 'all' | 'due_soon' | 'overdue'
@@ -19,14 +38,16 @@ export function VaccinationMgmtPage() {
   const [doseNotes, setDoseNotes] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Collect pending/due doses across all children in cohort
   const allPendingDoses = [];
   childrenList.forEach((child) => {
     child.doses?.forEach((dose) => {
-      if (dose.status === 'due_soon' || dose.status === 'overdue') {
+      if (dose.status !== 'administered') {
         allPendingDoses.push({
           ...dose,
+          status: getDoseStatus(dose),
           childId: child.id,
           childName: child.name,
           village: child.village,
@@ -50,7 +71,7 @@ export function VaccinationMgmtPage() {
     setAdministerModalOpen(true);
   };
 
-  const handleConfirmAdminister = (e) => {
+  const handleConfirmAdminister = async (e) => {
     e.preventDefault();
     if (!selectedDose) return;
 
@@ -59,20 +80,20 @@ export function VaccinationMgmtPage() {
       return;
     }
     setErrorMsg('');
+    setIsSaving(true);
 
-    administerDose(selectedDose.childId, selectedDose.vaccineId, {
-      vaccineName: selectedDose.vaccineName,
-      batch: batchNumber.trim(),
-      facility,
-      site,
-      dateAdministered: doseDate,
-      notes: doseNotes,
-      workerName: "Rekha Devi (ANM)",
-    });
-
-    setAdministerModalOpen(false);
-    setSuccessMsg(`Vaccine dose "${selectedDose.vaccineName}" successfully recorded for ${selectedDose.childName}.`);
-    setTimeout(() => setSuccessMsg(''), 4500);
+    try {
+      await administerDose(selectedDose.vaccineId, {
+        dateAdministered: doseDate,
+      });
+      setAdministerModalOpen(false);
+      setSuccessMsg(`Administration date saved for "${selectedDose.vaccineName}" for ${selectedDose.childName}.`);
+      setTimeout(() => setSuccessMsg(''), 4500);
+    } catch (error) {
+      setErrorMsg(error.message || 'Unable to save the vaccination record.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -119,6 +140,11 @@ export function VaccinationMgmtPage() {
         <div className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-[#007F68]" />
           <span>{successMsg}</span>
+        </div>
+      )}
+      {errorMsg && !administerModalOpen && (
+        <div role="alert" className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+          {errorMsg}
         </div>
       )}
 
@@ -197,7 +223,7 @@ export function VaccinationMgmtPage() {
               </div>
             )}
             <div className="p-3 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-[#005F52]">
-              <strong>Official Clinical Action:</strong> This dose will be recorded into the state registry and will update the caregiver's digital health pass.
+              <strong>Backend record:</strong> The connected API saves the administration date. Batch, facility, site, and notes are not currently stored.
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -270,9 +296,10 @@ export function VaccinationMgmtPage() {
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs"
+                disabled={isSaving}
+                className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs disabled:opacity-50"
               >
-                Commit Dose Entry
+                {isSaving ? 'Saving...' : 'Commit Dose Entry'}
               </button>
             </div>
           </form>

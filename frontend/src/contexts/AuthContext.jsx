@@ -110,7 +110,7 @@ export function AuthProvider({ children }) {
   ) => {
     if (identifier?.includes('@') && password) {
       const profile = await login(identifier, password);
-      if (profile.role !== role && !(role === 'worker' && profile.role === 'supervisor')) {
+      if (profile.role !== role) {
         sessionStorage.removeItem(TOKEN_KEY);
         setUser(null);
         throw new Error(`This account belongs to the ${profile.role} role. Please select the correct portal.`);
@@ -191,15 +191,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   const isRoleAuthenticated = useCallback((requiredRole) => {
-    if (!user) return false;
-    if (requiredRole === 'worker' || requiredRole === 'supervisor') {
-      return user.role === 'worker' || user.role === 'supervisor';
-    }
-    return user.role === requiredRole;
+    return Boolean(user && user.role === requiredRole);
   }, [user]);
 
   const parentUser = user?.role === 'parent' ? user : null;
-  const workerUser = (user?.role === 'worker' || user?.role === 'supervisor') ? user : null;
+  const workerUser = user?.role === 'worker' ? user : null;
 
   return (
     <AuthContext.Provider

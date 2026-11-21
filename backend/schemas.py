@@ -1,5 +1,6 @@
 from datetime import date
 from pydantic import BaseModel, EmailStr, Field
+from typing import Literal
 
 class UserRegister(BaseModel):
     name: str = Field(min_length=2, max_length=100)
@@ -22,6 +23,20 @@ class UserLogin(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class ChatHistoryItem(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=1000)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    history: list[ChatHistoryItem] = Field(default_factory=list, max_length=12)
+
+
+class ChatResponse(BaseModel):
+    reply: str
 
 
 class ChildCreate(BaseModel):
@@ -84,8 +99,6 @@ class GrowthResponse(BaseModel):
 
 
 
-from typing import Literal
-
 class MilestoneCreate(BaseModel):
     observation_date: date
     category: Literal[
@@ -116,8 +129,6 @@ class MilestoneResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
-
-from typing import Literal
 
 class AppointmentCreate(BaseModel):
     appointment_date: date

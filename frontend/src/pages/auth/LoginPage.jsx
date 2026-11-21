@@ -66,7 +66,7 @@ export function LoginPage() {
       const user = await login(email.trim(), password);
 
       // Prevent role mismatch
-      if (user.role !== selectedRole && !(selectedRole === 'worker' && user.role === 'supervisor')) {
+      if (user.role !== selectedRole) {
         logout();
         throw new Error(
           `This account belongs to the ${user.role} role. Please select the correct role.`
@@ -74,11 +74,13 @@ export function LoginPage() {
       }
 
       // Redirect to intended destination or role dashboard
-      let dest = intendedDestination;
+      let dest = typeof intendedDestination === 'string'
+        ? intendedDestination
+        : intendedDestination?.pathname;
       if (dest) {
-        if (selectedRole === 'parent' && !dest.startsWith('/parent')) dest = '/parent/dashboard';
-        if ((selectedRole === 'worker' || selectedRole === 'supervisor') && !dest.startsWith('/worker') && !dest.startsWith('/supervisor')) {
-          dest = selectedRole === 'supervisor' ? '/supervisor/analytics' : '/worker/dashboard';
+        const roleBase = `/${selectedRole}`;
+        if (dest !== roleBase && !dest.startsWith(`${roleBase}/`)) {
+          dest = dashboardPaths[user.role];
         }
       } else {
         dest = dashboardPaths[user.role] || '/parent/dashboard';

@@ -347,24 +347,9 @@ export function ParentAppointmentsPage() {
                     <div className="mt-2 text-[11px] text-[#294B57]/80 flex flex-wrap items-center gap-3">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-[#007F68]" />
-                        {apt.requestedDate} at {apt.timeSlot}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <User className="w-3.5 h-3.5 text-[#007F68]" />
-                        ANM: {apt.assignedWorker} (
-                        <a
-                          href="tel:+919412399887"
-                          className="underline hover:text-[#007F68]"
-                          title="Call ANM Rekha Devi"
-                        >
-                          +91 94123 99887
-                        </a>
-                        )
+                        Requested date: {appointment.requestedDate || 'Not recorded'}
                       </span>
                     </div>
-                    {apt.notes && (
-                      <p className="text-[11px] text-[#294B57]/80 mt-1 italic">Note: "{apt.notes}"</p>
-                    )}
                   </div>
                 </div>
 

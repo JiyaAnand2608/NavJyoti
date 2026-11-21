@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { useHealthData } from '../../contexts/HealthDataContext';
-import { useAuth } from '../../contexts/AuthContext';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { Baby, Plus, QrCode, ArrowRight, Edit2, Info, CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export function MyChildrenPage() {
-  const { user } = useAuth();
   const { childrenList, activeChildId, setActiveChildId, registerChild, updateChild } = useHealthData();
 
   // Modals state
@@ -32,7 +30,7 @@ export function MyChildrenPage() {
   const [editBirthWeight, setEditBirthWeight] = useState('3.1');
   const [editBloodGroup, setEditBloodGroup] = useState('B+');
 
-  const handleAddChild = (e) => {
+  const handleAddChild = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -45,31 +43,25 @@ export function MyChildrenPage() {
       return;
     }
 
-    registerChild({
-      name: name.trim(),
-      dob,
-      gender,
-      birthWeightKg: Number(birthWeightKg) || 3.1,
-      bloodGroup,
-      ageMonths: 1,
-      caregiverId: user ? user.id : "usr_parent_01",
-      caregiverName: user ? user.name : "Sunita Sharma",
-      caregiverPhone: user ? user.phone : "+91 98765 43210",
-      village: user?.village || "Rampur",
-      subCentre: "Rampur Sub-Centre",
-      phc: "Bilaspur Primary Health Centre",
-      migrationStatus: "resident",
-    });
+    try {
+      await registerChild({
+        name: name.trim(),
+        dob,
+      });
 
-    setIsAddModalOpen(false);
-    setName('');
-    setDob('');
-    setSuccessMsg(`Child profile for "${name}" registered successfully.`);
-    setTimeout(() => setSuccessMsg(''), 4000);
+      setIsAddModalOpen(false);
+      setName('');
+      setDob('');
+      setSuccessMsg(`Child profile for "${name}" registered successfully.`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (error) {
+      setErrorMsg(error.message || 'Unable to register this child.');
+    }
   };
 
   const handleOpenEdit = (child, e) => {
     e.stopPropagation();
+    setErrorMsg('');
     setSelectedChild(child);
     setEditName(child.name);
     setEditDob(child.dob);
@@ -79,21 +71,26 @@ export function MyChildrenPage() {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveEdit = (e) => {
+  const handleSaveEdit = async (e) => {
     e.preventDefault();
     if (!selectedChild) return;
 
-    updateChild(selectedChild.id, {
-      name: editName.trim(),
-      dob: editDob,
-      gender: editGender,
-      birthWeightKg: Number(editBirthWeight) || selectedChild.birthWeightKg,
-      bloodGroup: editBloodGroup,
-    });
+    setErrorMsg('');
+    try {
+      await updateChild(selectedChild.id, {
+        name: editName.trim(),
+        dob: editDob,
+        gender: editGender,
+        birthWeightKg: Number(editBirthWeight) || selectedChild.birthWeightKg,
+        bloodGroup: editBloodGroup,
+      });
 
-    setIsEditModalOpen(false);
-    setSuccessMsg(`Details updated for "${editName}".`);
-    setTimeout(() => setSuccessMsg(''), 4000);
+      setIsEditModalOpen(false);
+      setSuccessMsg(`Details updated for "${editName}".`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (error) {
+      setErrorMsg(error.message || 'Unable to update child details.');
+    }
   };
 
   const handleOpenDetails = (child, e) => {
@@ -333,6 +330,11 @@ export function MyChildrenPage() {
           subtitle="Update permitted demographic and birth measurements"
         >
           <form onSubmit={handleSaveEdit} className="space-y-4 text-xs text-[#294B57]">
+            {errorMsg && (
+              <div role="alert" className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
+                {errorMsg}
+              </div>
+            )}
             <div>
               <label className="block font-semibold text-[#103342] mb-1">Full Name</label>
               <input

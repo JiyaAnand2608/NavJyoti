@@ -50,7 +50,9 @@ from schemas import (
     AppointmentUpdate,
     FollowUpCreate,
     FollowUpResponse,
-    FollowUpUpdate
+    FollowUpUpdate,
+    ChatRequest,
+    ChatResponse
 )
 
 from auth import (
@@ -59,6 +61,12 @@ from auth import (
     create_access_token,
     decode_access_token
 )
+
+import os
+import re
+import time
+from collections import defaultdict, deque
+from groq import Groq, APIConnectionError, APIStatusError, RateLimitError
 
 
 app = FastAPI(title="NavJyoti API")
@@ -204,6 +212,170 @@ def read_current_user(
     current_user: User = Depends(get_current_user)
 ):
     return current_user
+
+
+chat_windows = defaultdict(lambda: deque())
+
+
+def reject_sensitive_chat_text(text: str):
+    patterns = [
+        r"\b(?:\+?91[\s-]?)?[6-9]\d{9}\b",
+        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+        r"\b\d{12}\b",
+        r"\b\d{10,16}\b",
+    ]
+    for pattern in patterns:
+        if re.search(pattern, text):
+            raise HTTPException(
+                status_code=400,
+                detail="Please remove private information or identifiers and try again.",
+            )
+
+    personal_child_reference = re.search(
+        r"\b(?:my|our)\s+(?:child|baby|infant|son|daughter|kid)\b",
+        text,
+        re.IGNORECASE,
+    )
+    child_health_detail = re.search(
+        r"\b(?:vaccin\w*|immuni[sz]\w*|dose|medical|health|symptom\w*|"
+        r"diagnos\w*|medicin\w*|fever|rash|cough|vomit\w*|diarrh\w*|"
+        r"weight|height|growth|allerg\w*|missed|received|taking|"
+        r"has|had|is sick)\b",
+        text,
+        re.IGNORECASE,
+    )
+    if personal_child_reference and child_health_detail:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Please ask a general educational question without sharing "
+                "personal child-health details."
+            ),
+        )
+
+
+def finish_chat_reply(reply: str, finish_reason: str | None) -> str:
+    reply = reply.strip()
+    if finish_reason != "length":
+        return reply
+
+    sentence_ends = list(re.finditer(r"[.!?।](?=\s|$)", reply))
+    if sentence_ends:
+        reply = reply[:sentence_ends[-1].end()].rstrip()
+        return (
+            f"{reply}\n\n"
+            "I shortened this reply to avoid leaving it incomplete. "
+            "Please ask me to continue or focus on one part."
+        )
+
+    return (
+        "I couldn't safely finish that reply within the response limit. "
+        "Please ask one focused follow-up question."
+    )
+
+@app.post("/chat", response_model=ChatResponse)
+def chat(
+    data: ChatRequest,
+    current_user: User = Depends(get_current_user),
+):
+    reject_sensitive_chat_text(data.message)
+
+    now = time.monotonic()
+    window = chat_windows[current_user.id]
+    window.append(now)
+    while window and now - window[0] > 60:
+        window.popleft()
+    if len(window) > 12:
+        window.popleft()
+        raise HTTPException(
+            status_code=429,
+            detail="Kidzy AI is receiving too many requests. Please wait a minute and try again.",
+        )
+
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Kidzy AI is temporarily unavailable. Please try again later.",
+        )
+
+    groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    system_prompt = (
+        "You are Kidzy AI, a friendly child-health companion for NavJyoti in India. "
+        "Tagline: Little Steps, Brighter Futures. "
+        "Give concise, culturally appropriate guidance in English or Hindi, matching the user's language. "
+        "Help with general childhood vaccinations, growth and development, nutrition, preventive care, "
+        "and explaining NavJyoti pages. For India's routine vaccine schedule, use the Government of India "
+        "National Health Mission (NHM) Immunization reference: "
+        "https://nhm.gov.in/index1.php?lang=1&level=2&sublinkid=824&lid=220. "
+        "When you give UIP timing, cite this source link in the answer. "
+        "UIP schedule facts: OPV-0 is an additional oral birth dose and does not replace the routine OPV "
+        "series; routine OPV doses are at 6, 10 and 14 weeks, with a booster at 16-24 months. "
+        "Pentavalent vaccine (DPT + Hepatitis B + Hib) is given at 6, 10 and 14 weeks; this does not "
+        "replace the separate Hepatitis B birth dose. Fractional IPV (fIPV) is given intradermally at "
+        "6 weeks, 14 weeks and 9-12 months under India's UIP schedule. PCV is given at 6 and 14 weeks "
+        "with a booster at 9-12 months. JE vaccine is only for endemic districts. Clearly label these "
+        "as India's UIP schedule; do not present optional/private schedules as UIP requirements, and "
+        "refer families to their local vaccination provider for current state implementation. "
+        "Do not diagnose, prescribe medication, give individualized medicine "
+        "dosages, claim to know personal records, or invent dates or medical histories. Clearly mark general "
+        "information, encourage qualified professional care for personal concerns, and advise prompt professional "
+        "or emergency help for urgent or serious symptoms. Never include or request names, phone numbers, addresses, "
+        "email addresses, Aadhaar numbers, medical records, or other private data. Do not use any child records "
+        "or chat history; answer using only the current general question."
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": data.message},
+    ]
+
+    try:
+        client = Groq(api_key=groq_api_key)
+        completion = client.chat.completions.create(
+            model=groq_model,
+            messages=messages,
+            temperature=0.6,
+            max_tokens=1200,
+            timeout=20,
+        )
+        choice = completion.choices[0]
+        reply = finish_chat_reply(
+            choice.message.content or "",
+            choice.finish_reason,
+        )
+        if not reply:
+            raise HTTPException(
+                status_code=502,
+                detail="Kidzy AI could not prepare a reply. Please try again.",
+            )
+        return {"reply": reply}
+    except RateLimitError:
+        raise HTTPException(
+            status_code=429,
+            detail="The AI provider is busy or has reached its usage limit. Please try again later.",
+        )
+    except APIConnectionError as e:
+        print("KIDZY Groq connection error:", type(e).__name__)
+        raise HTTPException(
+            status_code=502,
+            detail="Kidzy AI could not connect right now. Please try again.",
+        )
+
+    except APIStatusError as e:
+        print("KIDZY Groq API HTTP status:", e.status_code)
+        raise HTTPException(
+            status_code=502,
+            detail="Kidzy AI could not connect right now. Please try again.",
+        )
+
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=502,
+            detail="Kidzy AI could not complete the request. Please try again.",
+        )
 
 
 @app.post(
@@ -1024,3 +1196,25 @@ def supervisor_dashboard(
         "pending_followups": pending_followups,
         "upcoming_appointments": upcoming_appointments
     }
+
+
+def add_api_v1_aliases(app: FastAPI) -> None:
+    for route in list(app.router.routes):
+        path = getattr(route, "path", None)
+        if not path or path.startswith("/api/v1"):
+            continue
+
+        methods = list(getattr(route, "methods", []) or ["GET"])
+        if not methods:
+            continue
+
+        app.router.add_api_route(
+            path=f"/api/v1{path}",
+            endpoint=route.endpoint,
+            methods=methods,
+            response_model=getattr(route, "response_model", None),
+            status_code=getattr(route, "status_code", None),
+        )
+
+
+add_api_v1_aliases(app)

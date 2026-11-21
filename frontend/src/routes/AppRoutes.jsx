@@ -80,7 +80,7 @@ export function AppRoutes() {
             HEALTH WORKER ROUTES
             Only authenticated workers can access.
         ========================================== */}
-        <Route element={<ProtectedRoute allowedRoles={['worker', 'supervisor']} />}>
+        <Route element={<ProtectedRoute allowedRoles={['worker']} />}>
           <Route path="/worker" element={<DashboardLayout />}>
             <Route index element={<Navigate to="/worker/dashboard" replace />} />
             <Route path="dashboard" element={<WorkerDashboardOverview />} />
@@ -99,7 +99,7 @@ export function AppRoutes() {
             SUPERVISOR ROUTES
             Only authenticated supervisors can access.
         ========================================== */}
-        <Route element={<ProtectedRoute allowedRoles={['supervisor', 'worker']} />}>
+        <Route element={<ProtectedRoute allowedRoles={['supervisor']} />}>
           <Route path="/supervisor" element={<DashboardLayout />}>
             <Route index element={<Navigate to="/supervisor/analytics" replace />} />
             <Route path="analytics" element={<SupervisorAnalyticsPage />} />

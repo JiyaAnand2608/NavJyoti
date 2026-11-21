@@ -30,9 +30,11 @@ export function ChildDetailPage() {
   const [site, setSite] = useState('Left upper arm');
   const [doseNotes, setDoseNotes] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Follow-up notes editing
-  const child = childrenList.find((c) => c.id === id) || childrenList[0];
+  const child = childrenList.find((c) => String(c.id) === String(id));
   const [followUpText, setFollowUpText] = useState(child?.followUpNotes || '');
   const [isEditingNotes, setIsEditingNotes] = useState(false);
 
@@ -49,30 +51,37 @@ export function ChildDetailPage() {
     setAdministerModalOpen(true);
   };
 
-  const handleConfirmAdminister = (e) => {
+  const handleConfirmAdminister = async (e) => {
     e.preventDefault();
     if (targetVaccine) {
-      administerDose(child.id, targetVaccine.vaccineId, {
-        vaccineName: targetVaccine.vaccineName,
-        batch: batchNumber,
-        facility: facility,
-        workerName: "Rekha Devi (ANM)",
-        site: site,
-        notes: doseNotes,
-        dateAdministered: new Date().toISOString().split('T')[0],
-      });
-      setAdministerModalOpen(false);
-      setSuccessMsg(`Vaccine dose ${targetVaccine.vaccineName} officially administered & recorded.`);
-      setTimeout(() => setSuccessMsg(''), 4000);
+      setErrorMsg('');
+      setIsSaving(true);
+      try {
+        await administerDose(targetVaccine.vaccineId, {
+          dateAdministered: new Date().toISOString().split('T')[0],
+        });
+        setAdministerModalOpen(false);
+        setSuccessMsg(`Administration date saved for ${targetVaccine.vaccineName}.`);
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } catch (error) {
+        setErrorMsg(error.message || 'Unable to save the vaccination record.');
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
-  const handleSaveNotes = (e) => {
+  const handleSaveNotes = async (e) => {
     e.preventDefault();
-    updateFollowUp(child.id, { notes: followUpText });
-    setIsEditingNotes(false);
-    setSuccessMsg('Field follow-up notes updated.');
-    setTimeout(() => setSuccessMsg(''), 3000);
+    setErrorMsg('');
+    try {
+      await updateFollowUp(child.id, { notes: followUpText });
+      setIsEditingNotes(false);
+      setSuccessMsg('Field follow-up notes updated.');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (error) {
+      setErrorMsg(error.message || 'Unable to save follow-up notes.');
+    }
   };
 
   const administeredCount = child.doses?.filter(d => d.status === 'administered').length || 0;
@@ -94,6 +103,11 @@ export function ChildDetailPage() {
           <div className="mb-4 p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-[#007F68] shrink-0" />
             <span>{successMsg}</span>
+          </div>
+        )}
+        {errorMsg && (
+          <div role="alert" className="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+            {errorMsg}
           </div>
         )}
 
@@ -415,7 +429,7 @@ export function ChildDetailPage() {
         >
           <form onSubmit={handleConfirmAdminister} className="space-y-4 text-xs text-[#294B57]">
             <div className="p-3 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52]">
-              <strong>Official Clinical Action:</strong> Recording this dose commits it to the child's permanent digital health pass and updates parental notifications.
+              <strong>Backend record:</strong> The connected API saves the administration date. Batch, facility, site, provider, and notes are not currently stored.
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -487,9 +501,10 @@ export function ChildDetailPage() {
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs"
+                disabled={isSaving}
+                className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs disabled:opacity-50"
               >
-                Confirm Dose Administration
+                {isSaving ? 'Saving...' : 'Confirm Dose Administration'}
               </button>
             </div>
           </form>

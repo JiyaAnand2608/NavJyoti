@@ -30,8 +30,7 @@ export function ProtectedRoute({ allowedRoles = [] }) {
   // A session must contain both an authenticated state
   // and a user account returned by the authentication flow.
   if (!isAuthenticated || !user) {
-    const isWorkerRoute = allowedRoles.includes('worker') || allowedRoles.includes('supervisor');
-    const requiredRole = isWorkerRoute ? 'worker' : 'parent';
+    const requiredRole = allowedRoles[0] || 'parent';
     return (
       <Navigate
         to={`/auth/login?role=${requiredRole}`}

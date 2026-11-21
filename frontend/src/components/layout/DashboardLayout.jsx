@@ -5,6 +5,7 @@ import { TopHeader } from './TopHeader';
 import { MobileNavDrawer } from './MobileNavDrawer';
 import { useOffline } from '../../contexts/OfflineContext';
 import { WifiOff } from 'lucide-react';
+import { KidzyChat } from '../kidzy/KidzyChat';
 
 export function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -45,6 +46,7 @@ export function DashboardLayout() {
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-[#F5F1E9]">
           <Outlet />
         </main>
+        <KidzyChat />
       </div>
     </div>
   );

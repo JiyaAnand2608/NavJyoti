@@ -11,8 +11,8 @@ export function QrLookupPage() {
   const { qrToken } = useParams();
   const { childrenList } = useHealthData();
 
-  // Find child by token or default to first
-  const child = childrenList.find((c) => c.qrToken === qrToken) || childrenList[0];
+  // Never show another child's record when a token cannot be verified.
+  const child = childrenList.find((c) => c.qrToken && c.qrToken === qrToken);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F5F1E9] w-full overflow-x-hidden">
@@ -35,16 +35,21 @@ export function QrLookupPage() {
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold tracking-wider text-[#007F68]">
-                  Verified Digital Resolver
+                  {child ? 'Verified Digital Resolver' : 'Record Lookup'}
                 </span>
                 <h1 className="text-xl font-bold text-[#103342] font-serif">
                   Child Health Record Lookup
                 </h1>
               </div>
             </div>
-            <Badge variant="upToDate">National UIP Verified</Badge>
+            {child && <Badge variant="upToDate">National UIP Verified</Badge>}
           </div>
 
+          {!child ? (
+            <div role="status" className="p-4 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-xs text-[#294B57]">
+              This QR token could not be verified. Secure public QR lookup is not connected to the backend yet.
+            </div>
+          ) : (
           <div className="space-y-4 text-xs text-[#294B57]">
             <div className="grid grid-cols-2 gap-3 p-4 bg-[#F0EBE1]/70 rounded-xl border border-[#D8E6DA]">
               <div>
@@ -87,6 +92,7 @@ export function QrLookupPage() {
               </Link>
             </div>
           </div>
+          )}
         </Card>
       </main>
 

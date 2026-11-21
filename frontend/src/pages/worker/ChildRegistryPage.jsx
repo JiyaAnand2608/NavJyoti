@@ -17,6 +17,7 @@ export function ChildRegistryPage() {
   const [selectedChildForEdit, setSelectedChildForEdit] = useState(null);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // New child form
   const [name, setName] = useState('');
@@ -43,10 +44,10 @@ export function ChildRegistryPage() {
   const filteredChildren = childrenList.filter((child) => {
     const term = searchTerm.toLowerCase();
     const matchesSearch =
-      child.name.toLowerCase().includes(term) ||
-      child.id.toLowerCase().includes(term) ||
-      child.caregiverName.toLowerCase().includes(term) ||
-      child.caregiverPhone?.includes(term);
+      String(child.name ?? '').toLowerCase().includes(term) ||
+      String(child.id ?? '').toLowerCase().includes(term) ||
+      String(child.caregiverName ?? '').toLowerCase().includes(term) ||
+      String(child.caregiverPhone ?? '').toLowerCase().includes(term);
 
     const matchesVillage = villageFilter === 'all' || child.village === villageFilter;
     const matchesPriority =
@@ -66,7 +67,7 @@ export function ChildRegistryPage() {
     return matchesSearch && matchesVillage && matchesPriority && matchesAge;
   });
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -75,34 +76,31 @@ export function ChildRegistryPage() {
       return;
     }
 
-    registerChild({
-      name: name.trim(),
-      dob,
-      gender,
-      birthWeightKg: Number(birthWeightKg) || 3.1,
-      bloodGroup,
-      ageMonths: 1,
-      caregiverName: caregiverName.trim(),
-      caregiverPhone: caregiverPhone.trim(),
-      village,
-      subCentre: `${village} Sub-Centre`,
-      phc: "Bilaspur Primary Health Centre",
-      assignedWorker,
-      migrationStatus,
-    });
+    setIsSaving(true);
+    try {
+      await registerChild({
+        name: name.trim(),
+        dob,
+      });
 
-    setIsRegisterModalOpen(false);
-    setName('');
-    setDob('');
-    setCaregiverName('');
-    setCaregiverPhone('');
-    setSuccessMsg(`Child record for "${name}" registered successfully.`);
-    setTimeout(() => setSuccessMsg(''), 4000);
+      setIsRegisterModalOpen(false);
+      setName('');
+      setDob('');
+      setCaregiverName('');
+      setCaregiverPhone('');
+      setSuccessMsg(`Child record for "${name}" registered successfully.`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (error) {
+      setErrorMsg(error.message || 'Unable to register this child.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleOpenEdit = (child, e) => {
     e.preventDefault();
     e.stopPropagation();
+    setErrorMsg('');
     setSelectedChildForEdit(child);
     setEditName(child.name);
     setEditDob(child.dob);
@@ -115,25 +113,33 @@ export function ChildRegistryPage() {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveEdit = (e) => {
+  const handleSaveEdit = async (e) => {
     e.preventDefault();
     if (!selectedChildForEdit) return;
 
-    updateChild(selectedChildForEdit.id, {
-      name: editName.trim(),
-      dob: editDob,
-      gender: editGender,
-      caregiverName: editCaregiverName.trim(),
-      caregiverPhone: editCaregiverPhone.trim(),
-      village: editVillage,
-      subCentre: `${editVillage} Sub-Centre`,
-      assignedWorker: editAssignedWorker,
-      migrationStatus: editMigrationStatus,
-    });
+    setErrorMsg('');
+    setIsSaving(true);
+    try {
+      await updateChild(selectedChildForEdit.id, {
+        name: editName.trim(),
+        dob: editDob,
+        gender: editGender,
+        caregiverName: editCaregiverName.trim(),
+        caregiverPhone: editCaregiverPhone.trim(),
+        village: editVillage,
+        subCentre: `${editVillage} Sub-Centre`,
+        assignedWorker: editAssignedWorker,
+        migrationStatus,
+      });
 
-    setIsEditModalOpen(false);
-    setSuccessMsg(`Child record for "${editName}" updated successfully.`);
-    setTimeout(() => setSuccessMsg(''), 4000);
+      setIsEditModalOpen(false);
+      setSuccessMsg(`Child record for "${editName}" updated successfully.`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (error) {
+      setErrorMsg(error.message || 'Unable to update child details.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -458,9 +464,10 @@ export function ChildRegistryPage() {
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs"
+              disabled={isSaving}
+              className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs disabled:opacity-50"
             >
-              Register Child
+              {isSaving ? 'Saving...' : 'Register Child'}
             </button>
           </div>
         </form>
@@ -475,6 +482,11 @@ export function ChildRegistryPage() {
           subtitle={`Child ID: ${selectedChildForEdit.id}`}
         >
           <form onSubmit={handleSaveEdit} className="space-y-4 text-xs text-[#294B57]">
+            {errorMsg && (
+              <div role="alert" className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
+                {errorMsg}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block font-semibold text-[#103342] mb-1">Full Name</label>
@@ -569,9 +581,10 @@ export function ChildRegistryPage() {
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs"
+                disabled={isSaving}
+                className="px-5 py-2 rounded-xl bg-[#007F68] text-white font-semibold text-xs hover:bg-[#005F52] cursor-pointer shadow-xs disabled:opacity-50"
               >
-                Save Changes
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </form>

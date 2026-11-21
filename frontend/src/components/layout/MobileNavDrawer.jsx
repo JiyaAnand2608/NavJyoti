@@ -27,7 +27,9 @@ export function MobileNavDrawer({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  const isWorker = role === 'worker' || role === 'supervisor';
+  const currentRole = user?.role || role;
+  const isWorker = currentRole === 'worker';
+  const isSupervisor = currentRole === 'supervisor';
 
   const parentNav = [
     { name: "Dashboard", path: "/parent/dashboard", icon: LayoutDashboard },
@@ -48,12 +50,23 @@ export function MobileNavDrawer({ isOpen, onClose }) {
     { name: "Follow-ups", path: "/worker/priority", icon: ShieldAlert },
     { name: "Appointments", path: "/worker/appointments", icon: CalendarCheck },
     { name: "Messages", path: "/worker/messages", icon: MessageSquare },
-    { name: "Reports", path: "/supervisor/analytics", icon: BarChart3 },
     { name: "QR Handoff", path: "/worker/qr-handoff", icon: QrCode },
     { name: "Settings", path: "/worker/profile", icon: Settings },
   ];
 
-  const navItems = isWorker ? workerNav : parentNav;
+  const supervisorNav = [
+    { name: "Health Analytics", path: "/supervisor/analytics", icon: BarChart3 },
+  ];
+  const navItems = isSupervisor
+    ? supervisorNav
+    : isWorker
+      ? workerNav
+      : parentNav;
+  const homePath = isSupervisor
+    ? "/supervisor/analytics"
+    : isWorker
+      ? "/worker/dashboard"
+      : "/parent/dashboard";
 
   const handleLogout = () => {
     logout();
@@ -69,7 +82,7 @@ export function MobileNavDrawer({ isOpen, onClose }) {
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-white/10">
             <Link
-              to={isWorker ? "/worker/dashboard" : "/parent/dashboard"}
+              to={homePath}
               onClick={onClose}
               className="flex items-center gap-3 group"
               title="Return to Portal Dashboard"
@@ -84,7 +97,7 @@ export function MobileNavDrawer({ isOpen, onClose }) {
               <div>
                 <span className="font-bold text-base font-serif">NavJyoti</span>
                 <span className="block text-[10px] text-[#A8D5B5] font-semibold uppercase">
-                  {isWorker ? "Worker Portal" : "Parent Portal"}
+                  {isSupervisor ? "Supervisor Portal" : isWorker ? "Worker Portal" : "Parent Portal"}
                 </span>
               </div>
             </Link>
@@ -125,18 +138,18 @@ export function MobileNavDrawer({ isOpen, onClose }) {
           <button
             onClick={() => {
               onClose();
-              if (isWorker) {
-                switchRole('parent');
-                navigate('/auth/login?role=parent', { state: { role: 'parent', from: '/parent/dashboard' } });
-              } else {
+              if (currentRole === 'parent') {
                 switchRole('worker');
                 navigate('/auth/login?role=worker', { state: { role: 'worker', from: '/worker/dashboard' } });
+              } else {
+                switchRole('parent');
+                navigate('/auth/login?role=parent', { state: { role: 'parent', from: '/parent/dashboard' } });
               }
             }}
             className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-white/10 text-xs font-medium hover:bg-white/15 cursor-pointer text-white"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Switch to {isWorker ? 'Parent Portal' : 'Worker Portal'}</span>
+            <span>Switch to {currentRole === 'parent' ? 'Worker Portal' : 'Parent Portal'}</span>
           </button>
           <button
             onClick={handleLogout}

@@ -1,11 +1,21 @@
 
-const API_BASE_URL =
+const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
-  "http://127.0.0.1:8000";
+  "http://127.0.0.1:8000"
+)
+  .replace(/\/+$/, "")
+  .replace(/(?:\/api\/v1)+$/i, "");
+
+export function apiUrl(endpoint) {
+  const normalizedEndpoint = endpoint
+    .replace(/^(?:\/api\/v1)+(?=\/|$)/i, "")
+    .replace(/^\/+/, "");
+  return `${API_BASE_URL}/${normalizedEndpoint}`;
+}
 
 async function request(endpoint, options = {}) {
   const response = await fetch(
-    `${API_BASE_URL}${endpoint}`,
+    apiUrl(endpoint),
     {
       ...options,
       headers: {
@@ -70,4 +80,15 @@ export const backendApi = {
       Authorization: `Bearer ${token}`,
     },
   }),
+
+    chat: (token, message) =>
+      request("/chat", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message,
+        }),
+      }),
 };

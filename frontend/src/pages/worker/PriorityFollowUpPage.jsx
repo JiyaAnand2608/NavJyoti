@@ -18,6 +18,7 @@ export function PriorityFollowUpPage() {
   const [outreachNotes, setOutreachNotes] = useState('');
   const [newPriority, setNewPriority] = useState('amber');
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const redList = childrenList.filter((c) => c.priorityLevel === 'red');
   const amberList = childrenList.filter((c) => c.priorityLevel === 'amber');
@@ -36,18 +37,23 @@ export function PriorityFollowUpPage() {
     setIsModalOpen(true);
   };
 
-  const handleSaveOutreach = (e) => {
+  const handleSaveOutreach = async (e) => {
     e.preventDefault();
     if (!selectedChild) return;
 
-    updateFollowUp(selectedChild.id, {
-      priorityLevel: newPriority,
-      notes: `[${outreachStatus.toUpperCase()}] ${outreachNotes.trim()}`,
-    });
+    setErrorMsg('');
+    try {
+      await updateFollowUp(selectedChild.id, {
+        priorityLevel: newPriority,
+        notes: `[${outreachStatus.toUpperCase()}] ${outreachNotes.trim()}`,
+      });
 
-    setIsModalOpen(false);
-    setSuccessMsg(`Outreach recorded for ${selectedChild.name}. Priority updated to ${newPriority.toUpperCase()}.`);
-    setTimeout(() => setSuccessMsg(''), 4000);
+      setIsModalOpen(false);
+      setSuccessMsg(`Outreach recorded for ${selectedChild.name}. Priority updated to ${newPriority.toUpperCase()}.`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (error) {
+      setErrorMsg(error.message || 'Unable to save follow-up changes.');
+    }
   };
 
   return (
@@ -70,6 +76,11 @@ export function PriorityFollowUpPage() {
         <div className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-[#007F68]" />
           <span>{successMsg}</span>
+        </div>
+      )}
+      {errorMsg && !isModalOpen && (
+        <div role="alert" className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+          {errorMsg}
         </div>
       )}
 
@@ -197,6 +208,11 @@ export function PriorityFollowUpPage() {
           subtitle={`Caregiver: ${selectedChild.caregiverName} (${selectedChild.caregiverPhone})`}
         >
           <form onSubmit={handleSaveOutreach} className="space-y-4 text-xs text-[#294B57]">
+            {errorMsg && (
+              <div role="alert" className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700">
+                {errorMsg}
+              </div>
+            )}
             <div>
               <label className="block font-semibold text-[#103342] mb-1">Outreach Action Taken</label>
               <select

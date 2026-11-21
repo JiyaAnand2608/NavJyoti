@@ -11,6 +11,7 @@ export function CommunicationCenterPage() {
   const [templateLang, setTemplateLang] = useState('hi');
   const [messageType, setMessageType] = useState('due_soon');
   const [sentNotice, setSentNotice] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const selectedChild = childrenList.find((c) => c.id === selectedChildId) || childrenList[0];
 
@@ -39,21 +40,26 @@ export function CommunicationCenterPage() {
     setMessageText(templates[l][messageType]);
   };
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
     if (!messageText.trim() || !selectedChild) return;
 
-    sendSimulatedMessage({
-      recipientName: selectedChild.caregiverName,
-      recipientPhone: selectedChild.caregiverPhone,
-      childId: selectedChild.id,
-      childName: selectedChild.name,
-      message: messageText.trim(),
-      type: messageType,
-    });
+    setErrorMsg('');
+    try {
+      await sendSimulatedMessage({
+        recipientName: selectedChild.caregiverName,
+        recipientPhone: selectedChild.caregiverPhone,
+        childId: selectedChild.id,
+        childName: selectedChild.name,
+        message: messageText.trim(),
+        type: messageType,
+      });
 
-    setSentNotice(true);
-    setTimeout(() => setSentNotice(false), 4000);
+      setSentNotice(true);
+      setTimeout(() => setSentNotice(false), 4000);
+    } catch (error) {
+      setErrorMsg(error.message || 'Unable to send this message.');
+    }
   };
 
   return (
@@ -79,6 +85,11 @@ export function CommunicationCenterPage() {
         <div className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-[#007F68]" />
           <span>Simulated SMS alert successfully delivered to {selectedChild?.caregiverPhone}! Added to message log.</span>
+        </div>
+      )}
+      {errorMsg && (
+        <div role="alert" className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+          {errorMsg}
         </div>
       )}
 

@@ -7,7 +7,11 @@ export function NotFoundPage() {
   const { isAuthenticated, role } = useAuth();
   const navigate = useNavigate();
 
-  const dashboardPath = role === 'worker' ? '/worker/dashboard' : '/parent/dashboard';
+  const dashboardPath = role === 'supervisor'
+    ? '/supervisor/analytics'
+    : role === 'worker'
+      ? '/worker/dashboard'
+      : '/parent/dashboard';
 
   return (
     <div className="min-h-screen bg-[#F5F1E9] text-[#294B57] flex flex-col justify-between p-4 sm:p-6 lg:p-8">

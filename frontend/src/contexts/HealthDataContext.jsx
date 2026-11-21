@@ -2,18 +2,17 @@ import React, {
   createContext, useContext, useState, useEffect, useMemo, useCallback,
 } from 'react';
 import { useAuth } from './AuthContext';
-import { backendApi } from '../services/backendApi';
+import { apiUrl, backendApi } from '../services/backendApi';
 import { getLastSelectedChildId, setLastSelectedChildId } from '../services/storage';
 
 const HealthDataContext = createContext(null);
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 const TOKEN_KEY = 'navjyoti_access_token';
 
 async function apiRequest(path, options = {}) {
   const token = sessionStorage.getItem(TOKEN_KEY);
   if (!token) throw new Error('Please sign in again.');
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -32,7 +31,14 @@ async function apiRequest(path, options = {}) {
   return result;
 }
 
-function formatChild(record, currentUser, vaccinations = [], growth = [], milestones = []) {
+function formatChild(
+  record,
+  currentUser,
+  vaccinations = [],
+  growth = [],
+  milestones = [],
+  followUps = []
+) {
   const dob = record.date_of_birth;
   return {
     id: record.id,
@@ -76,7 +82,16 @@ function formatChild(record, currentUser, vaccinations = [], growth = [], milest
       notes: m.description,
     })),
     visitHistory: [],
-    followUpNotes: '',
+    followUps: followUps.map((followUp) => ({
+      id: followUp.id,
+      dueDate: followUp.due_date,
+      reason: followUp.reason,
+      status: followUp.status,
+    })),
+    followUpNotes: followUps
+      .filter((followUp) => followUp.status === 'pending')
+      .map((followUp) => `${followUp.reason} (Due ${followUp.due_date})`)
+      .join('; '),
   };
 }
 
@@ -142,14 +157,28 @@ export function HealthDataProvider({ children }) {
 
         const detailed = await Promise.all(records.map(async (record) => {
           // Parent and assigned worker vaccination access is checked by FastAPI.
-          const [vaccinations, growth, milestones, childAppointments] = await Promise.all([
+          const [
+            vaccinations,
+            growth,
+            milestones,
+            childAppointments,
+            childFollowUps,
+          ] = await Promise.all([
             apiRequest(`/children/${record.id}/vaccinations`),
             apiRequest(`/children/${record.id}/growth`),
             apiRequest(`/children/${record.id}/milestones`),
             apiRequest(`/children/${record.id}/appointments`),
+            apiRequest(`/children/${record.id}/follow-ups`),
           ]);
           return {
-            child: formatChild(record, user, vaccinations, growth, milestones),
+            child: formatChild(
+              record,
+              user,
+              vaccinations,
+              growth,
+              milestones,
+              childFollowUps
+            ),
             appointments: childAppointments.map(formatAppointment),
           };
         }));
@@ -170,7 +199,7 @@ export function HealthDataProvider({ children }) {
 
     loadChildren();
     return () => { cancelled = true; };
-  }, [user?.id, user?.role, authLoading, refreshIndex]);
+  }, [user, authLoading, refreshIndex]);
 
   // The server filters records for the authenticated parent or worker.
   const accessibleChildren = useMemo(() => {
@@ -189,7 +218,7 @@ export function HealthDataProvider({ children }) {
       const matched = accessibleChildren.find((c) => String(c.id) === String(saved));
       return (matched || accessibleChildren[0]).id;
     });
-  }, [user?.id, user?.role, accessibleChildren]);
+  }, [user, accessibleChildren]);
 
   const setActiveChildId = (childId) => {
     const matched = accessibleChildren.find((c) => String(c.id) === String(childId));
@@ -219,7 +248,20 @@ export function HealthDataProvider({ children }) {
   // The existing UI actions below must not silently alter local copies of
   // medical data. Wire them to verified API endpoints before enabling them.
   const updateChild = async () => notConnected('Child profile editing');
-  const administerDose = async () => notConnected('Vaccination recording from this screen');
+  const administerDose = async (vaccinationId, data = {}) => {
+    const now = new Date();
+    const administeredDate = data.dateAdministered ||
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const updated = await apiRequest(
+      `/worker/vaccinations/${vaccinationId}/complete`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ administered_date: administeredDate }),
+      }
+    );
+    refreshChildren();
+    return updated;
+  };
   const recordMilestoneObservation = async () => notConnected('Milestone recording from this screen');
   const updateFollowUp = async () => notConnected('Follow-up changes from this screen');
 

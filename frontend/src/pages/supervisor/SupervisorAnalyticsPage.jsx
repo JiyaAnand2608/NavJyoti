@@ -15,10 +15,7 @@ import {
   Activity,
   UserRoundCheck,
 } from 'lucide-react';
-
-const API_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  'http://127.0.0.1:8000';
+import { apiUrl } from '../../services/backendApi';
 
 const TOKEN_KEY = 'navjyoti_access_token';
 
@@ -73,7 +70,7 @@ export function SupervisorAnalyticsPage() {
         }
 
         const response = await fetch(
-          `${API_URL}/supervisor/dashboard`,
+          apiUrl('/supervisor/dashboard'),
           {
             method: 'GET',
             headers: {
