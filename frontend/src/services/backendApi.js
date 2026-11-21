@@ -81,7 +81,7 @@ export const backendApi = {
     },
   }),
 
-    chat: (token, message) =>
+    chat: (token, message, options = {}) =>
       request("/chat", {
         method: "POST",
         headers: {
@@ -89,6 +89,10 @@ export const backendApi = {
         },
         body: JSON.stringify({
           message,
+          history: options.history || [],
+          language: options.language || "en",
+          role: options.role || "parent",
+          page: options.page || "",
         }),
       }),
 };

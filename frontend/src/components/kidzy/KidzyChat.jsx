@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Send, Trash2, X } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Maximize2, Minimize2, RotateCcw, Send, Trash2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { backendApi } from '../../services/backendApi';
+import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { KidzyRobot } from './KidzyRobot';
 
 const TOKEN_KEY = 'navjyoti_access_token';
@@ -10,9 +13,16 @@ const HISTORY_KEY = 'kidzy_ai_history';
 const GREETING_SHOWN_KEY = 'kidzy_greeting_shown';
 const GREETING_DISMISSED_KEY = 'kidzy_greeting_dismissed';
 const WAVE_SHOWN_KEY = 'kidzy_wave_shown';
-const GREETING = "Namaste! 👋 I'm Kidzy AI, your friendly child-health companion! I'm here to help you understand vaccinations, nutrition, growth milestones, and healthcare appointments. How can I help you today?";
-const DISCLAIMER = 'Kidzy AI provides general child-health education and app guidance. It does not replace professional medical advice. Do not share private health information.';
+const GREETING = "Hello! 👋 I'm Kidzy, your child-health companion. I'm here to help you understand vaccinations, growth, nutrition, developmental milestones, and navigate NavJyoti. How can I help you today?";
+const DISCLAIMER = 'Kidzy AI provides general child-health education and NavJyoti assistance. It is not a substitute for professional medical advice.';
 const HELLO_BUBBLE = "Hi! 👋 I'm Kidzy. Need some help?";
+const SUGGESTED_QUESTIONS = [
+  'Understanding vaccinations',
+  'Growth and developmental milestones',
+  'Child nutrition',
+  'Appointments and reminders',
+  'How to use NavJyoti',
+];
 
 function loadHistory() {
   try {
@@ -24,14 +34,20 @@ function loadHistory() {
 }
 
 export function KidzyChat() {
+  const { role } = useAuth();
+  const { lang } = useLanguage();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState(loadHistory);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [lastFailedMessage, setLastFailedMessage] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHello, setShowHello] = useState(false);
   const [waveOnFirstDisplay, setWaveOnFirstDisplay] = useState(false);
   const endRef = useRef(null);
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     if (sessionStorage.getItem(WAVE_SHOWN_KEY)) return;
@@ -68,8 +84,10 @@ export function KidzyChat() {
   }, [messages, loading, open]);
 
   const clearConversation = () => {
+    if (!window.confirm('Clear your active Kidzy AI conversation?')) return;
     setMessages([]);
     setError('');
+    setLastFailedMessage('');
     sessionStorage.removeItem(HISTORY_KEY);
   };
 
@@ -84,10 +102,9 @@ export function KidzyChat() {
     setOpen(true);
   };
 
-  const sendMessage = async (event) => {
-    event?.preventDefault();
-    const message = input.trim();
-    if (!message || loading) return;
+  const sendText = async (message, appendUser = true) => {
+    const text = message.trim();
+    if (!text || sendingRef.current) return;
 
     const token = sessionStorage.getItem(TOKEN_KEY);
     if (!token) {
@@ -95,14 +112,22 @@ export function KidzyChat() {
       return;
     }
 
+    sendingRef.current = true;
     setInput('');
     setError('');
-    const nextMessages = [...messages, { role: 'user', content: message }];
-    setMessages(nextMessages);
+    setLastFailedMessage('');
+    if (appendUser) {
+      setMessages((current) => [...current, { role: 'user', content: text }]);
+    }
     setLoading(true);
 
     try {
-      const data = await backendApi.chat(token, message);
+      const data = await backendApi.chat(token, text, {
+        history: messages.slice(-12),
+        language: lang,
+        role: role || 'parent',
+        page: location.pathname,
+      });
       setMessages((current) => [
         ...current,
         { role: 'assistant', content: data.reply },
@@ -111,6 +136,7 @@ export function KidzyChat() {
       const text = requestError instanceof Error
         ? requestError.message
         : 'Kidzy AI could not connect.';
+      setLastFailedMessage(message);
       if (/429|rate|limit|busy/i.test(text)) {
         setError('Kidzy AI is receiving too many requests or reached a provider limit. Please wait and try again.');
       } else if (/network|fetch|failed/i.test(text)) {
@@ -119,8 +145,14 @@ export function KidzyChat() {
         setError(text);
       }
     } finally {
+      sendingRef.current = false;
       setLoading(false);
     }
+  };
+
+  const sendMessage = (event) => {
+    event?.preventDefault();
+    sendText(input);
   };
 
   return (
@@ -157,17 +189,32 @@ export function KidzyChat() {
         <section
           role="dialog"
           aria-label="Kidzy AI chat"
-          className="fixed bottom-3 right-3 z-50 flex h-[min(620px,calc(100vh-24px))] w-[min(380px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border border-[#D8E6DA] bg-[#FBF8F2] shadow-[0_18px_48px_rgba(16,51,66,0.28)] sm:bottom-5 sm:right-5"
+          className={
+            isFullscreen
+              ? 'kidzy-fullscreen fixed inset-0 z-[70] flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#FBF8F2]'
+              : 'fixed bottom-3 right-3 z-50 flex h-[min(620px,calc(100vh-24px))] w-[min(380px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border border-[#D8E6DA] bg-[#FBF8F2] shadow-[0_18px_48px_rgba(16,51,66,0.28)] sm:bottom-5 sm:right-5'
+          }
         >
-          <header className="flex items-center justify-between bg-[#103342] px-4 py-3 text-white">
+          <header className="flex items-center justify-between bg-[#005F52] px-4 py-3 text-white">
             <div className="flex items-center gap-3">
               <KidzyRobot compact responding={loading} />
               <div>
-                <h2 className="font-heading text-sm font-bold text-white">KIDZY AI</h2>
-                <p className="text-[10px] text-[#DDF0E3]">Little Steps, Brighter Futures.</p>
+                <h2 className="font-heading text-sm font-bold text-white">Kidzy AI</h2>
+                <p className="text-[10px] text-[#DDF0E3]">Little Steps, Brighter Futures</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setIsFullscreen((current) => !current)}
+                aria-label={isFullscreen ? 'Exit full-screen view' : 'Open full-screen view'}
+                title={isFullscreen ? 'Exit full-screen' : 'Full screen'}
+                className="rounded-full p-2 text-[#DDF0E3] hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#DDF0E3]"
+              >
+                {isFullscreen
+                  ? <Minimize2 className="h-4 w-4" aria-hidden="true" />
+                  : <Maximize2 className="h-4 w-4" aria-hidden="true" />}
+              </button>
               <button
                 type="button"
                 onClick={clearConversation}
@@ -191,8 +238,23 @@ export function KidzyChat() {
 
           <div className="flex-1 overflow-y-auto px-3 py-4" aria-live="polite">
             {messages.length === 0 && (
-              <div className="mb-3 max-w-[88%] rounded-2xl rounded-bl-md bg-[#DDF0E3] px-3 py-2.5 text-sm leading-relaxed text-[#294B57]">
-                {GREETING}
+              <div className="mx-auto w-full max-w-2xl">
+                <div className="mb-3 max-w-[88%] rounded-2xl rounded-bl-md bg-[#DDF0E3] px-3 py-2.5 text-sm leading-relaxed text-[#294B57]">
+                  {GREETING}
+                </div>
+                <div className="mb-3 flex flex-wrap gap-2" aria-label="Suggested questions">
+                  {SUGGESTED_QUESTIONS.map((question) => (
+                    <button
+                      key={question}
+                      type="button"
+                      onClick={() => sendText(question)}
+                      disabled={loading}
+                      className="rounded-full border border-[#A8D5B5] bg-white px-3 py-1.5 text-xs font-semibold text-[#005F52] shadow-sm hover:bg-[#F0EBE1] disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[#007F68]"
+                    >
+                      {question}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {messages.map((message, index) => (
@@ -243,6 +305,31 @@ export function KidzyChat() {
                         blockquote: ({ node, ...props }) => (
                           <blockquote className="mb-2 border-l-2 border-[#007F68] pl-3 italic last:mb-0" {...props} />
                         ),
+                        a: ({ node, href, children, ...props }) => {
+                          const external = /^https?:\/\//i.test(href || '');
+                          if (!external && href?.startsWith('/')) {
+                            return (
+                              <Link
+                                to={href}
+                                onClick={() => setOpen(false)}
+                                className="font-bold text-[#005F52] underline decoration-[#A8D5B5] underline-offset-2"
+                              >
+                                {children}
+                              </Link>
+                            );
+                          }
+                          return (
+                            <a
+                              href={href}
+                              target={external ? '_blank' : undefined}
+                              rel={external ? 'noopener noreferrer' : undefined}
+                              className="font-bold text-[#005F52] underline decoration-[#A8D5B5] underline-offset-2"
+                              {...props}
+                            >
+                              {children}
+                            </a>
+                          );
+                        },
                         code: ({ node, ...props }) => (
                           <code className="rounded bg-white/70 px-1 py-0.5 text-[0.9em]" {...props} />
                         ),
@@ -264,15 +351,26 @@ export function KidzyChat() {
               </div>
             )}
             {error && (
-              <div className="mb-3 rounded-lg border border-[#E57373]/30 bg-[#FDECEC] px-3 py-2 text-xs text-[#8A3434]" role="alert">
-                {error}
+              <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-[#E57373]/30 bg-[#FDECEC] px-3 py-2 text-xs text-[#8A3434]" role="alert">
+                <span>{error}</span>
+                {lastFailedMessage && (
+                  <button
+                    type="button"
+                    onClick={() => sendText(lastFailedMessage, false)}
+                    disabled={loading}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#8A3434]/30 px-2 py-1 font-bold hover:bg-white/70 disabled:opacity-50"
+                  >
+                    <RotateCcw className="h-3 w-3" aria-hidden="true" />
+                    Retry
+                  </button>
+                )}
               </div>
             )}
             <div ref={endRef} />
           </div>
 
           <div className="border-t border-[#D8E6DA] bg-[#FBF8F2] p-3">
-            <p className="mb-2 text-[10px] leading-snug text-[#294B57]/75">{DISCLAIMER}</p>
+            <p className="mb-2 text-[11px] leading-snug text-[#294B57]">{DISCLAIMER}</p>
             <form onSubmit={sendMessage} className="flex items-center gap-2">
               <label htmlFor="kidzy-message" className="sr-only">Message Kidzy AI</label>
               <input

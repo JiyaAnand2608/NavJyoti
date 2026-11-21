@@ -192,6 +192,21 @@
   animation: kidzy-greeting-in 350ms ease-out both;
 }
 
+.kidzy-fullscreen {
+  border: 0;
+  border-radius: 0;
+}
+
+@media (max-width: 639px) {
+  .kidzy-fullscreen > header {
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+
+  .kidzy-fullscreen > div:last-child {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+
 @keyframes kidzy-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }

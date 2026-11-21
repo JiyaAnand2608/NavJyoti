@@ -33,6 +33,9 @@ class ChatHistoryItem(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     history: list[ChatHistoryItem] = Field(default_factory=list, max_length=12)
+    language: Literal["en", "hi"] = "en"
+    role: Literal["parent", "worker", "supervisor"] = "parent"
+    page: str = Field(default="", max_length=300)
 
 
 class ChatResponse(BaseModel):

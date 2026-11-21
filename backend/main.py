@@ -279,6 +279,8 @@ def chat(
     current_user: User = Depends(get_current_user),
 ):
     reject_sensitive_chat_text(data.message)
+    for item in data.history:
+        reject_sensitive_chat_text(item.content)
 
     now = time.monotonic()
     window = chat_windows[current_user.id]
@@ -300,14 +302,40 @@ def chat(
         )
 
     groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    role_name = {
+        "parent": "parent/caregiver",
+        "worker": "healthcare worker",
+        "supervisor": "authority/supervisor",
+    }.get(data.role, "parent/caregiver")
+    language_name = "Hindi" if data.language == "hi" else "English"
     system_prompt = (
         "You are Kidzy AI, a friendly child-health companion for NavJyoti in India. "
         "Tagline: Little Steps, Brighter Futures. "
-        "Give concise, culturally appropriate guidance in English or Hindi, matching the user's language. "
+        f"The current NavJyoti interface language is {language_name}; respond primarily in that language. "
+        "English and Hindi/Hinglish queries are supported; switch language only to match the user's wording. "
+        f"Adapt your explanation to a {role_name}. "
+        f"The user is currently on the NavJyoti page {data.page or '/'}; "
+        "mention the current page naturally only when it helps navigation. "
         "Help with general childhood vaccinations, growth and development, nutrition, preventive care, "
         "and explaining NavJyoti pages. For India's routine vaccine schedule, use the Government of India "
         "National Health Mission (NHM) Immunization reference: "
         "https://nhm.gov.in/index1.php?lang=1&level=2&sublinkid=824&lid=220. "
+        "Use only verified authoritative sources. For general guidance, may reference WHO "
+        "(https://www.who.int/health-topics/child-health), UNICEF India "
+        "(https://www.unicef.org/india/child-health), and MoHFW India "
+        "(https://www.mohfw.gov.in/). Include a relevant source link when giving health advice, "
+        "and never invent or fabricate a record, date, schedule, citation, or source. "
+        "NavJyoti navigation links: Parent vaccination tracker (/parent/vaccines), developmental milestones "
+        "(/parent/milestones), appointments (/parent/appointments), reminders (/parent/reminders), child records "
+        "(/parent/records), and help (/parent/help). Healthcare-worker equivalents include /worker/registry, "
+        "/worker/vaccinations, /worker/appointments, /worker/priority, and /worker/messages. Supervisors use "
+        "/supervisor/analytics. Provide these as Markdown links only when relevant. "
+        "For irrelevant questions, briefly redirect to child-health, vaccinations, nutrition, growth, milestones, "
+        "NavJyoti navigation, or appropriate professional help. "
+        "For possible emergencies (breathing difficulty, severe bleeding, blue/gray lips, seizure, "
+        "unresponsiveness, severe dehydration, or similar), advise stopping online use and seeking immediate "
+        "professional/emergency care. "
+        "Never diagnose or prescribe medicines, give medication dosages, or suggest that you can modify clinical records. "
         "When you give UIP timing, cite this source link in the answer. "
         "UIP schedule facts: OPV-0 is an additional oral birth dose and does not replace the routine OPV "
         "series; routine OPV doses are at 6, 10 and 14 weeks, with a booster at 16-24 months. "
@@ -327,8 +355,12 @@ def chat(
 
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": data.message},
     ]
+    messages.extend(
+        {"role": item.role, "content": item.content}
+        for item in data.history[-12:]
+    )
+    messages.append({"role": "user", "content": data.message})
 
     try:
         client = Groq(api_key=groq_api_key)
