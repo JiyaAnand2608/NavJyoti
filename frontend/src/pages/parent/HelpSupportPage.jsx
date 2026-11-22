@@ -14,6 +14,7 @@ export function HelpSupportPage() {
   const [contactSubject, setContactSubject] = useState('Dose Inquiry');
   const [contactMessage, setContactMessage] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   // FAQ Accordion State
   const [openFaqIndex, setOpenFaqIndex] = useState(0);
@@ -37,23 +38,28 @@ export function HelpSupportPage() {
     }
   ];
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!contactMessage.trim()) return;
 
-    sendSimulatedMessage({
-      recipientName: "Rekha Devi (ANM)",
-      recipientPhone: "+91 94123 99887",
-      childId: activeChild?.id || "NJ-2024-0891",
-      childName: activeChild?.name || "Aarav Sharma",
-      message: `[${contactSubject}] ${contactMessage.trim()}`,
-      type: "inquiry",
-    });
+    setErrorMsg('');
+    try {
+      await sendSimulatedMessage({
+        recipientName: "Rekha Devi (ANM)",
+        recipientPhone: user?.phone,
+        childId: activeChild?.id,
+        childName: activeChild?.name,
+        message: `[${contactSubject}] ${contactMessage.trim()}`,
+        type: "inquiry",
+      });
 
-    setIsContactModalOpen(false);
-    setContactMessage('');
-    setFeedback('Simulated message sent to ANM Rekha Devi. In a live system, your frontline worker is alerted.');
-    setTimeout(() => setFeedback(''), 4500);
+      setIsContactModalOpen(false);
+      setContactMessage('');
+      setFeedback('Message sent successfully.');
+      setTimeout(() => setFeedback(''), 4500);
+    } catch (error) {
+      setErrorMsg(error.message || 'Unable to send this message.');
+    }
   };
 
   return (
@@ -69,6 +75,11 @@ export function HelpSupportPage() {
         <div className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-[#007F68] shrink-0" />
           <span>{feedback}</span>
+        </div>
+      )}
+      {errorMsg && (
+        <div role="alert" className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+          {errorMsg}
         </div>
       )}
 
@@ -172,11 +183,11 @@ export function HelpSupportPage() {
         isOpen={isContactModalOpen}
         onClose={() => setIsContactModalOpen(false)}
         title="Contact Assigned ANM (Rekha Devi)"
-        subtitle="Simulated caregiver inquiry to frontline worker"
+        subtitle="Caregiver inquiry to frontline worker"
       >
         <form onSubmit={handleSendMessage} className="space-y-4 text-xs text-[#294B57]">
           <div className="p-3 rounded-xl bg-[#F0EBE1] border border-[#D8E6DA] text-xs">
-            <strong>Simulation Channel:</strong> Messages sent here are logged in the health worker's communication center for demonstration.
+            <strong>Messaging unavailable:</strong> Messages cannot currently be delivered or logged.
           </div>
 
           <div>

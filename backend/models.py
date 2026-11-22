@@ -10,7 +10,8 @@ from sqlalchemy import (
     CheckConstraint,
     Float,
     Index,
-    Text
+    Text,
+    func,
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -66,7 +67,7 @@ class User(Base):
     audit_logs = relationship(
         "AuditLog",
         back_populates="user",
-        cascade="all, delete-orphan"
+        passive_deletes=True
     )
 
 
@@ -154,7 +155,7 @@ class Child(Base):
     audit_logs = relationship(
         "AuditLog",
         back_populates="child",
-        cascade="all, delete-orphan"
+        passive_deletes=True
     )
 
 
@@ -178,6 +179,15 @@ class Vaccination(Base):
     worker_name = Column(String(100), nullable=True)
     site = Column(String(50), nullable=True)
     notes = Column(String(300), nullable=True)
+
+    __table_args__ = (
+        Index(
+            "uq_vaccinations_child_vaccine_stage",
+            child_id,
+            func.lower(func.trim(vaccine_name)),
+            unique=True,
+        ),
+    )
 
     child = relationship("Child", back_populates="vaccinations")
 
@@ -337,7 +347,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     child_id = Column(Integer, ForeignKey("children.id", ondelete="SET NULL"), nullable=True, index=True)
     action_type = Column(String(50), nullable=False, index=True)
     record_type = Column(String(50), nullable=False)
@@ -349,4 +359,3 @@ class AuditLog(Base):
 
     user = relationship("User", back_populates="audit_logs")
     child = relationship("Child", back_populates="audit_logs")
-

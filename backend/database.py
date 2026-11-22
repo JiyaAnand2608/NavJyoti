@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
@@ -9,20 +10,40 @@ from sqlalchemy.orm import sessionmaker
 BASE_DIR = Path(__file__).resolve().parent
 ENV_FILE = os.getenv("NAVJYOTI_ENV_FILE", ".env")
 
-load_dotenv(BASE_DIR / ENV_FILE, override=True)
+load_dotenv(BASE_DIR / ENV_FILE, override=False)
 
 
 def get_database_url() -> str:
+    environment = os.getenv("ENVIRONMENT", "development").strip().lower()
+
+    if environment == "testing":
+        test_url = os.getenv("NAVJYOTI_TEST_DATABASE_URL")
+        if not test_url:
+            return "sqlite:///:memory:"
+        if test_url.startswith(("postgresql://", "postgres://")):
+            test_url = test_url.replace(
+                "postgres://" if test_url.startswith("postgres://") else "postgresql://",
+                "postgresql+psycopg://",
+                1,
+            )
+        return test_url
+
     # Explicit DATABASE_URL (PostgreSQL, Neon, or SQLite for isolated tests)
     cloud_url = os.getenv("DATABASE_URL")
 
     if cloud_url:
-        if cloud_url.startswith("postgresql://"):
+        if cloud_url.startswith(("postgresql://", "postgres://")):
             cloud_url = cloud_url.replace(
-                "postgresql://",
+                "postgres://" if cloud_url.startswith("postgres://") else "postgresql://",
                 "postgresql+psycopg://",
                 1,
             )
+        if environment == "production":
+            parsed_url = urlparse(cloud_url)
+            if parsed_url.scheme.startswith("sqlite"):
+                raise RuntimeError("Production DATABASE_URL must use PostgreSQL.")
+            if parsed_url.hostname in {"localhost", "127.0.0.1", "::1"}:
+                raise RuntimeError("Production DATABASE_URL must not point to localhost.")
         return cloud_url
 
     # Local PostgreSQL parameters
@@ -31,56 +52,24 @@ def get_database_url() -> str:
     db_name = os.getenv("DB_NAME")
 
     if db_user and db_name:
+        db_host = os.getenv("DB_HOST", "localhost")
+        if environment == "production" and db_host in {"localhost", "127.0.0.1", "::1"}:
+            raise RuntimeError("Production DB_HOST must not point to localhost.")
         return str(URL.create(
             drivername="postgresql+psycopg",
             username=db_user,
             password=db_password,
-            host=os.getenv("DB_HOST", "localhost"),
+            host=db_host,
             port=int(os.getenv("DB_PORT", "5432")),
             database=db_name,
         ))
 
-    # Check if a local PostgreSQL cluster is already running in pgdata
-    pgdata_dir = BASE_DIR.parent / "pgdata"
-    postmaster_file = pgdata_dir / "postmaster.pid"
-    if postmaster_file.exists():
-        try:
-            lines = postmaster_file.read_text().splitlines()
-            if len(lines) >= 4:
-                active_port = int(lines[3].strip())
-                import socket
-                s = socket.socket()
-                s.settimeout(0.5)
-                if s.connect_ex(("127.0.0.1", active_port)) == 0:
-                    s.close()
-                    return f"postgresql+psycopg://postgres:@127.0.0.1:{active_port}/navjyoti"
-                s.close()
-        except Exception:
-            pass
+    if environment == "production":
+        raise RuntimeError(
+            "DATABASE_URL or DB_USER/DB_NAME must be configured in production."
+        )
 
-    # Native self-contained PostgreSQL instance (pgserver)
-    try:
-        import pgserver
-        pgdata_dir = BASE_DIR.parent / "pgdata"
-        if not pgdata_dir.exists():
-            pgdata_dir.mkdir(parents=True, exist_ok=True)
-        srv = pgserver.get_server(pgdata_dir, cleanup_mode=None)
-        # Ensure 'navjyoti' database exists without noisy stderr
-        try:
-            check_sql = "SELECT 1 FROM pg_database WHERE datname = 'navjyoti';"
-            res = srv.psql(check_sql)
-            if "1" not in res:
-                srv.psql("CREATE DATABASE navjyoti;")
-        except Exception:
-            pass
-        pg_uri = srv.get_uri("navjyoti")
-        if pg_uri.startswith("postgresql://"):
-            pg_uri = pg_uri.replace("postgresql://", "postgresql+psycopg://", 1)
-        return pg_uri
-    except Exception:
-        pass
-
-    # Safe fallback if unconfigured: default local postgresql URL string
+    # Development default for a locally managed PostgreSQL instance.
     return "postgresql+psycopg://postgres:postgres@localhost:5432/navjyoti"
 
 

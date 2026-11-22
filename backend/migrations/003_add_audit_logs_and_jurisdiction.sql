@@ -12,7 +12,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS jurisdiction VARCHAR(100);
 -- 2. Create audit_logs table
 CREATE TABLE IF NOT EXISTS audit_logs (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     child_id INTEGER REFERENCES children(id) ON DELETE SET NULL,
     action_type VARCHAR(50) NOT NULL,
     record_type VARCHAR(50) NOT NULL,

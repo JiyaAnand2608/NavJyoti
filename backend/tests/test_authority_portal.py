@@ -116,6 +116,7 @@ class TestAuthorityPortal(unittest.TestCase):
         sup_no_j_id = cls.supervisor_no_jurisdiction.id
         worker_id = cls.worker_rampur.id
         worker_bil_id = cls.worker_bilaspur.id
+        cls.worker_bilaspur_id = worker_bil_id
         parent_id = cls.parent.id
 
         # Create children
@@ -269,6 +270,174 @@ class TestAuthorityPortal(unittest.TestCase):
         res = self.client.get("/supervisor/alerts", headers={"Authorization": f"Bearer {self.sup_token}"})
         self.assertEqual(res.status_code, 200)
         self.assertIsInstance(res.json(), list)
+
+    def test_10_worker_cannot_read_or_change_unassigned_child_records(self):
+        db = TestingSessionLocal()
+        vaccination = Vaccination(
+            child_id=self.child_bilaspur_id,
+            vaccine_name="UNASSIGNED DOSE",
+            due_date=date.today(),
+            completed=False
+        )
+        db.add(vaccination)
+        db.commit()
+        vaccination_id = vaccination.id
+        db.close()
+        headers = {"Authorization": f"Bearer {self.worker_token}"}
+
+        requests = [
+            self.client.get(f"/children/{self.child_bilaspur_id}", headers=headers),
+            self.client.get(f"/children/{self.child_bilaspur_id}/vaccinations", headers=headers),
+            self.client.post(
+                f"/children/{self.child_bilaspur_id}/vaccinations",
+                json={"vaccine_name": "FOREIGN DOSE", "due_date": date.today().isoformat()},
+                headers=headers,
+            ),
+            self.client.patch(
+                f"/worker/vaccinations/{vaccination_id}/complete",
+                json={"administered_date": date.today().isoformat()},
+                headers=headers,
+            ),
+            self.client.post(
+                f"/worker/vaccinations/administer?child_id={self.child_bilaspur_id}",
+                json={"vaccine_name": "FOREIGN DOSE", "administered_date": date.today().isoformat()},
+                headers=headers,
+            ),
+            self.client.get(f"/children/{self.child_bilaspur_id}/growth", headers=headers),
+            self.client.post(
+                f"/children/{self.child_bilaspur_id}/growth",
+                json={
+                    "measurement_date": date.today().isoformat(),
+                    "weight_kg": 10,
+                    "height_cm": 80,
+                },
+                headers=headers,
+            ),
+            self.client.get(f"/children/{self.child_bilaspur_id}/milestones", headers=headers),
+            self.client.post(
+                f"/children/{self.child_bilaspur_id}/milestones",
+                json={
+                    "observation_date": date.today().isoformat(),
+                    "category": "motor",
+                    "description": "Sits without support",
+                    "status": "observed",
+                },
+                headers=headers,
+            ),
+            self.client.get(f"/children/{self.child_bilaspur_id}/appointments", headers=headers),
+            self.client.get(f"/children/{self.child_bilaspur_id}/follow-ups", headers=headers),
+            self.client.post(
+                f"/children/{self.child_bilaspur_id}/qr-token",
+                headers=headers,
+            ),
+        ]
+        self.assertTrue(all(response.status_code == 403 for response in requests))
+
+    def test_11_parent_cannot_change_worker_or_jurisdiction(self):
+        headers = {"Authorization": f"Bearer {self.parent_token}"}
+        db = TestingSessionLocal()
+        other_parent = User(
+            name="Other Parent",
+            password_hash=hash_password("ParentPass123!"),
+            role="parent",
+            village="Bilaspur",
+        )
+        db.add(other_parent)
+        db.flush()
+        other_child = Child(
+            name="Other Child",
+            date_of_birth=date(2025, 2, 1),
+            parent_id=other_parent.id,
+            village="Bilaspur",
+        )
+        db.add(other_child)
+        db.commit()
+        other_child_id = other_child.id
+        db.close()
+
+        cross_user_read = self.client.get(
+            f"/children/{other_child_id}",
+            headers=headers,
+        )
+        assigned_worker = self.client.patch(
+            f"/children/{self.child_rampur_id}",
+            json={"assigned_worker_id": self.worker_bilaspur_id},
+            headers=headers,
+        )
+        changed_village = self.client.patch(
+            f"/children/{self.child_rampur_id}",
+            json={"village": "Bilaspur"},
+            headers=headers,
+        )
+        self.assertEqual(cross_user_read.status_code, 403)
+        self.assertEqual(assigned_worker.status_code, 403)
+        self.assertEqual(changed_village.status_code, 403)
+
+        supervisor_write = self.client.patch(
+            f"/children/{self.child_rampur_id}",
+            json={"name": "Unauthorized Supervisor Edit"},
+            headers={"Authorization": f"Bearer {self.sup_token}"},
+        )
+        self.assertEqual(supervisor_write.status_code, 403)
+
+    def test_12_district_like_jurisdiction_is_not_a_global_access_bypass(self):
+        db = TestingSessionLocal()
+        broad_label_user = User(
+            name="Unscoped Supervisor",
+            email="unscoped.supervisor@navjyoti.gov.in",
+            password_hash=hash_password("SupervisorPass123!"),
+            role="supervisor",
+            jurisdiction="all",
+        )
+        db.add(broad_label_user)
+        db.commit()
+        db.refresh(broad_label_user)
+        token = create_access_token(broad_label_user.id, role="supervisor")
+        db.close()
+
+        response = self.client.get(
+            "/supervisor/dashboard",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["total_workers"], 0)
+        self.assertEqual(response.json()["total_children"], 0)
+
+    def test_13_failed_child_creation_rolls_back_without_audit_event(self):
+        original_recorder = main.record_audit_event
+
+        def fail_audit(**_kwargs):
+            raise RuntimeError("simulated audit failure")
+
+        main.record_audit_event = fail_audit
+        try:
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    "/children",
+                    json={
+                        "name": "Rollback Child",
+                        "date_of_birth": date(2025, 1, 1).isoformat(),
+                        "gender": "Female",
+                    },
+                    headers={"Authorization": f"Bearer {self.parent_token}"},
+                )
+        finally:
+            main.record_audit_event = original_recorder
+
+        db = TestingSessionLocal()
+        self.assertIsNone(db.query(Child).filter(Child.name == "Rollback Child").first())
+        self.assertIsNone(
+            db.query(AuditLog).filter(AuditLog.action_type == "CREATE_CHILD").first()
+        )
+        db.close()
+
+    def test_14_duplicate_vaccination_stage_is_rejected_case_insensitively(self):
+        response = self.client.post(
+            f"/children/{self.child_rampur_id}/vaccinations",
+            json={"vaccine_name": "bcg", "due_date": date.today().isoformat()},
+            headers={"Authorization": f"Bearer {self.parent_token}"},
+        )
+        self.assertEqual(response.status_code, 409)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ export function ParentProfilePage() {
   const [phone, setPhone] = useState(user?.phone || '');
   const [village, setVillage] = useState(user?.village || 'Rampur');
   const [feedback, setFeedback] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
 
   const handleSaveProfile = (e) => {
@@ -41,11 +42,15 @@ export function ParentProfilePage() {
     navigate('/auth/login', { replace: true });
   };
 
-  const handleExecuteReset = () => {
-    resetDemoData();
-    setConfirmReset(false);
-    alert("Demo data successfully restored to factory initial state.");
-    navigate('/');
+  const handleExecuteReset = async () => {
+    setErrorMsg('');
+    try {
+      await resetDemoData();
+      setConfirmReset(false);
+      navigate('/');
+    } catch (error) {
+      setErrorMsg(error.message || 'Unable to reset demo data.');
+    }
   };
 
   return (
@@ -71,6 +76,11 @@ export function ParentProfilePage() {
         <div className="p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-[#007F68] shrink-0" />
           <span>{feedback}</span>
+        </div>
+      )}
+      {errorMsg && (
+        <div role="alert" className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+          {errorMsg}
         </div>
       )}
 

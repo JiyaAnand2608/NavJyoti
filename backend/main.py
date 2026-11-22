@@ -76,6 +76,8 @@ from schemas import (
     FollowUpCreate,
     FollowUpResponse,
     FollowUpUpdate,
+    ChatRequest,
+    ChatResponse,
     NotificationResponse,
     CommunicationCreate,
     CommunicationResponse,
@@ -94,20 +96,34 @@ from schemas import (
     SupervisorProfileResponse
 )
 from phone_utils import normalize_indian_phone, is_valid_indian_phone
+import re
+import time
+from collections import defaultdict, deque
+from groq import Groq, APIConnectionError, APIStatusError, RateLimitError
+
 
 app = FastAPI(title="NavJyoti API", version="1.0.0")
 
+default_cors_origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
+    "https://navjyoti-web.vercel.app",
+]
+configured_cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if "*" in configured_cors_origins:
+    raise ValueError("CORS_ORIGINS must list trusted origins; '*' is not allowed.")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:5175",
-        "https://navjyoti-web.vercel.app",
-    ],
+    allow_origins=list(dict.fromkeys(default_cors_origins + configured_cors_origins)),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -189,13 +205,42 @@ def record_audit_event(
     new_values: Optional[dict] = None
 ) -> AuditLog:
     """
-    Atomically records a patient record mutation event to the audit trail.
-    Committed in the same database transaction as the clinical modification.
-    Strictly filters out any credentials or secrets.
+    Add a mutation event to the clinical transaction while excluding credentials
+    and direct personal identifiers from the audit payload.
     """
-    forbidden_keys = {"password", "password_hash", "token", "otp", "secret"}
-    safe_prev = {k: v for k, v in previous_values.items() if k not in forbidden_keys} if previous_values else None
-    safe_new = {k: v for k, v in new_values.items() if k not in forbidden_keys} if new_values else None
+    sensitive_key_fragments = (
+        "password",
+        "token",
+        "otp",
+        "secret",
+        "name",
+        "phone",
+        "email",
+        "address",
+        "village",
+        "date_of_birth",
+        "notes",
+        "message",
+        "recipient",
+        "aadhaar",
+        "parent_id",
+        "worker_id",
+        "assigned_worker_id",
+        "child_id",
+        "record_id",
+    )
+
+    def safe_values(values: Optional[dict]) -> Optional[dict]:
+        if not values:
+            return None
+        return {
+            key: value
+            for key, value in values.items()
+            if not any(fragment in key.casefold() for fragment in sensitive_key_fragments)
+        } or None
+
+    safe_prev = safe_values(previous_values)
+    safe_new = safe_values(new_values)
 
     audit_entry = AuditLog(
         user_id=user_id,
@@ -212,12 +257,38 @@ def record_audit_event(
     return audit_entry
 
 
+def flush_vaccination_changes(db: Session) -> None:
+    try:
+        db.flush()
+    except IntegrityError as error:
+        db.rollback()
+        if "uq_vaccinations_child_vaccine_stage" in str(error.orig):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This vaccine stage is already scheduled or recorded for this child."
+            ) from error
+        raise
+
+
+def commit_vaccination_changes(db: Session) -> None:
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        if "uq_vaccinations_child_vaccine_stage" in str(error.orig):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This vaccine stage is already scheduled or recorded for this child."
+            ) from error
+        raise
+
+
 def get_supervisor_jurisdiction(supervisor: User) -> str:
     """
     Retrieves the assigned healthcare jurisdiction for an authenticated supervisor.
     If no jurisdiction or village is assigned, access is safely denied.
     """
-    jurisdiction = (supervisor.jurisdiction or supervisor.village or "").strip()
+    jurisdiction = (supervisor.jurisdiction or "").strip()
     if not jurisdiction:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -230,12 +301,11 @@ def get_jurisdiction_worker_ids(db: Session, jurisdiction: str) -> List[int]:
     """
     Returns the user IDs of all healthcare workers within the assigned jurisdiction.
     """
-    j_lower = jurisdiction.lower()
-    if j_lower in ("district hq", "all", "all-jurisdictions", "district"):
-        return [w.id for w in db.query(User.id).filter(User.role == "worker").all()]
+    j_lower = jurisdiction.strip().lower()
     workers = db.query(User.id).filter(
         User.role == "worker",
-        (func.lower(User.jurisdiction) == j_lower) | (func.lower(User.village) == j_lower)
+        (func.lower(func.trim(User.jurisdiction)) == j_lower)
+        | (func.lower(func.trim(User.village)) == j_lower)
     ).all()
     return [w.id for w in workers]
 
@@ -244,13 +314,86 @@ def get_jurisdiction_child_ids(db: Session, jurisdiction: str, worker_ids: List[
     """
     Returns the child IDs of all children belonging to the assigned jurisdiction or assigned workers.
     """
-    j_lower = jurisdiction.lower()
-    if j_lower in ("district hq", "all", "all-jurisdictions", "district"):
-        return [c.id for c in db.query(Child.id).all()]
+    j_lower = jurisdiction.strip().lower()
     children = db.query(Child.id).filter(
-        (func.lower(Child.village) == j_lower) | (Child.assigned_worker_id.in_(worker_ids) if worker_ids else False)
+        (func.lower(func.trim(Child.village)) == j_lower)
+        | (Child.assigned_worker_id.in_(worker_ids) if worker_ids else False)
     ).all()
     return [c.id for c in children]
+
+
+def get_authorized_child(
+    child_id: int,
+    current_user: User,
+    db: Session,
+    *,
+    allow_supervisor: bool = True,
+    for_update: bool = False
+) -> Child:
+    child_query = db.query(Child).filter(Child.id == child_id)
+    if for_update:
+        child_query = child_query.with_for_update()
+    child = child_query.first()
+    if child is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Child record not found."
+        )
+
+    if current_user.role == "parent":
+        authorized = child.parent_id == current_user.id
+    elif current_user.role == "worker":
+        authorized = child.assigned_worker_id == current_user.id
+    elif current_user.role == "supervisor":
+        if not allow_supervisor:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Supervisors are restricted to read-only oversight."
+            )
+        jurisdiction = get_supervisor_jurisdiction(current_user)
+        worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+        authorized = child.id in get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied."
+        )
+
+    if not authorized:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to access this child record."
+        )
+    return child
+
+
+def get_authorized_child_record(
+    model,
+    record_id: int,
+    resource_name: str,
+    current_user: User,
+    db: Session,
+    *,
+    allow_supervisor: bool = True,
+    for_update: bool = False
+):
+    record_query = db.query(model).filter(model.id == record_id)
+    if for_update:
+        record_query = record_query.with_for_update()
+    record = record_query.first()
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{resource_name} not found."
+        )
+    child = get_authorized_child(
+        record.child_id,
+        current_user,
+        db,
+        allow_supervisor=allow_supervisor,
+        for_update=for_update
+    )
+    return record, child
 
 
 
@@ -393,6 +536,170 @@ def read_current_user(
     return current_user
 
 
+chat_windows = defaultdict(lambda: deque())
+
+
+def canonical_chat_question(message: str) -> str:
+    lowered = message.casefold()
+    topic_keywords = {
+        "vaccination": ("vaccin", "immuniz", "immunis", "dose", "schedule", "opv", "bcg"),
+        "growth": ("growth", "weight", "height", "nutrition", "feeding", "food"),
+        "development": ("milestone", "development", "speech", "walking", "motor"),
+        "navigation": ("navjyoti", "dashboard", "appointment", "records", "reminder", "page"),
+        "urgent care": ("emergency", "breathing", "seizure", "unresponsive", "severe bleeding"),
+    }
+
+    for topic, keywords in topic_keywords.items():
+        if any(keyword in lowered for keyword in keywords):
+            return (
+                f"Give a concise general educational explanation about {topic} for children in India. "
+                "Do not refer to an individual child, infer personal facts, or claim access to records."
+            )
+
+    return (
+        "Briefly explain Kidzy AI's general child-health education and NavJyoti assistance scope, "
+        "then invite a general question about vaccinations, growth, nutrition, milestones, or app navigation."
+    )
+
+
+def finish_chat_reply(reply: str, finish_reason: str | None) -> str:
+    reply = reply.strip()
+    if finish_reason != "length":
+        return reply
+
+    sentence_ends = list(re.finditer(r"[.!?।](?=\s|$)", reply))
+    if sentence_ends:
+        reply = reply[:sentence_ends[-1].end()].rstrip()
+        return (
+            f"{reply}\n\n"
+            "I shortened this reply to avoid leaving it incomplete. "
+            "Please ask me to continue or focus on one part."
+        )
+
+    return (
+        "I couldn't safely finish that reply within the response limit. "
+        "Please ask one focused follow-up question."
+    )
+
+@app.post("/chat", response_model=ChatResponse)
+def chat(
+    data: ChatRequest,
+    current_user: User = Depends(get_current_user),
+):
+    now = time.monotonic()
+    window = chat_windows[current_user.id]
+    window.append(now)
+    while window and now - window[0] > 60:
+        window.popleft()
+    if len(window) > 12:
+        window.popleft()
+        raise HTTPException(
+            status_code=429,
+            detail="Kidzy AI is receiving too many requests. Please wait a minute and try again.",
+        )
+
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Kidzy AI is temporarily unavailable. Please try again later.",
+        )
+
+    groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    role_name = {
+        "parent": "parent/caregiver",
+        "worker": "healthcare worker",
+        "supervisor": "authority/supervisor",
+    }.get(current_user.role, "parent/caregiver")
+    language_name = "Hindi" if data.language == "hi" else "English"
+    system_prompt = (
+        "You are Kidzy AI, a friendly child-health companion for NavJyoti in India. "
+        "Tagline: Little Steps, Brighter Futures. "
+        f"The current NavJyoti interface language is {language_name}; respond primarily in that language. "
+        "English and Hindi/Hinglish queries are supported; switch language only to match the user's wording. "
+        f"Adapt your explanation to a {role_name}. "
+        "Help with general childhood vaccinations, growth and development, nutrition, preventive care, "
+        "and explaining NavJyoti pages. For India's routine vaccine schedule, use the Government of India "
+        "National Health Mission (NHM) Immunization reference: "
+        "https://nhm.gov.in/index1.php?lang=1&level=2&sublinkid=824&lid=220. "
+        "Use only verified authoritative sources. For general guidance, may reference WHO "
+        "(https://www.who.int/health-topics/child-health), UNICEF India "
+        "(https://www.unicef.org/india/child-health), and MoHFW India "
+        "(https://www.mohfw.gov.in/). Include a relevant source link when giving health advice, "
+        "and never invent or fabricate a record, date, schedule, citation, or source. "
+        "NavJyoti navigation links: Parent vaccination tracker (/parent/vaccines), developmental milestones "
+        "(/parent/milestones), appointments (/parent/appointments), reminders (/parent/reminders), child records "
+        "(/parent/records), and help (/parent/help). Healthcare-worker equivalents include /worker/registry, "
+        "/worker/vaccinations, /worker/appointments, /worker/priority, and /worker/messages. Supervisors use "
+        "/supervisor/analytics. Provide these as Markdown links only when relevant. "
+        "For irrelevant questions, briefly redirect to child-health, vaccinations, nutrition, growth, milestones, "
+        "NavJyoti navigation, or appropriate professional help. "
+        "For possible emergencies (breathing difficulty, severe bleeding, blue/gray lips, seizure, "
+        "unresponsiveness, severe dehydration, or similar), advise stopping online use and seeking immediate "
+        "professional/emergency care. "
+        "Never diagnose or prescribe medicines, give medication dosages, or suggest that you can modify clinical records. "
+        "When you give UIP timing, cite this source link in the answer. "
+        "UIP schedule facts: OPV-0 is an additional oral birth dose and does not replace the routine OPV "
+        "series; routine OPV doses are at 6, 10 and 14 weeks, with a booster at 16-24 months. "
+        "Pentavalent vaccine (DPT + Hepatitis B + Hib) is given at 6, 10 and 14 weeks; this does not "
+        "replace the separate Hepatitis B birth dose. Fractional IPV (fIPV) is given intradermally at "
+        "6 weeks, 14 weeks and 9-12 months under India's UIP schedule. PCV is given at 6 and 14 weeks "
+        "with a booster at 9-12 months. JE vaccine is only for endemic districts. Clearly label these "
+        "as India's UIP schedule; do not present optional/private schedules as UIP requirements, and "
+        "refer families to their local vaccination provider for current state implementation. "
+        "Do not diagnose, prescribe medication, give individualized medicine "
+        "dosages, claim to know personal records, or invent dates or medical histories. Clearly mark general "
+        "information, encourage qualified professional care for personal concerns, and advise prompt professional "
+        "or emergency help for urgent or serious symptoms. Never include or request names, phone numbers, addresses, "
+        "email addresses, Aadhaar numbers, medical records, or other private data. Do not use any child records "
+        "or chat history; answer only the supplied general topic."
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": canonical_chat_question(data.message)},
+    ]
+
+    try:
+        client = Groq(api_key=groq_api_key)
+        completion = client.chat.completions.create(
+            model=groq_model,
+            messages=messages,
+            temperature=0.6,
+            max_tokens=1200,
+            timeout=20,
+        )
+        choice = completion.choices[0]
+        reply = finish_chat_reply(
+            choice.message.content or "",
+            choice.finish_reason,
+        )
+        if not reply:
+            raise HTTPException(
+                status_code=502,
+                detail="Kidzy AI could not prepare a reply. Please try again.",
+            )
+        return {"reply": reply}
+    except RateLimitError:
+        raise HTTPException(
+            status_code=429,
+            detail="The AI provider is busy or has reached its usage limit. Please try again later.",
+        )
+    except APIConnectionError as e:
+        print("KIDZY Groq connection error:", type(e).__name__)
+        raise HTTPException(
+            status_code=502,
+            detail="Kidzy AI could not connect right now. Please try again.",
+        )
+
+    except APIStatusError as e:
+        print("KIDZY Groq API HTTP status:", e.status_code)
+        raise HTTPException(
+            status_code=502,
+            detail="Kidzy AI could not connect right now. Please try again.",
+        )
+
+
 # ==============================================================================
 # PHASE 4: HEALTH WORKER & SUPERVISOR EMAIL OTP AUTHENTICATION
 # ==============================================================================
@@ -453,16 +760,36 @@ def create_child(
 
     if current_user.role == "parent":
         parent_id = current_user.id
-        assigned_worker_id = data.assigned_worker_id
+        if data.assigned_worker_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Parents cannot assign healthcare workers directly."
+            )
+        assigned_worker_id = None
     elif current_user.role == "worker":
-        # Worker registering a child in the field:
-        # If parent_id is provided, verify it exists; else assign current user as primary worker
-        parent_id = current_user.id  # Default link if caregiver profile is pending
+        parent_id = current_user.id
+        if data.assigned_worker_id not in (None, current_user.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Workers can only assign themselves to a child during registration."
+            )
         assigned_worker_id = current_user.id
     else:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Supervisors cannot register individual children directly."
+        )
+
+    assigned_village = current_user.village or (
+        current_user.jurisdiction if current_user.role == "worker" else None
+    )
+    if data.village and (
+        not assigned_village
+        or data.village.strip().casefold() != assigned_village.strip().casefold()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Child location must match the authenticated user's registered location."
         )
 
     child = Child(
@@ -471,7 +798,7 @@ def create_child(
         parent_id=parent_id,
         assigned_worker_id=assigned_worker_id,
         gender=data.gender or "Male",
-        village=data.village,
+        village=assigned_village,
         blood_group=data.blood_group,
         birth_weight_kg=data.birth_weight_kg,
         migration_status=data.migration_status or "resident",
@@ -521,7 +848,10 @@ def get_accessible_children(
         worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
         child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
         return db.query(Child).filter(Child.id.in_(child_ids) if child_ids else False).all()
-    return []
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Access denied."
+    )
 
 
 @app.get(
@@ -533,32 +863,7 @@ def get_child_by_id(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Child record not found."
-        )
-
-    # Authorization verification
-    if current_user.role == "parent" and child.parent_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not authorized to view this child record."
-        )
-    if current_user.role == "worker" and child.assigned_worker_id != current_user.id:
-        pass
-    if current_user.role == "supervisor":
-        jurisdiction = get_supervisor_jurisdiction(current_user)
-        worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
-        child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
-        if child.id not in child_ids:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Child record outside assigned jurisdiction."
-            )
-
-    return child
+    return get_authorized_child(child_id, current_user, db)
 
 
 @app.patch(
@@ -571,23 +876,36 @@ def update_child(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Child record not found."
-        )
-
-    # Authorization
-    if current_user.role == "supervisor":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Supervisors are restricted to oversight and cannot directly modify clinical records."
-        )
-    if current_user.role == "parent" and child.parent_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    child = get_authorized_child(
+        child_id,
+        current_user,
+        db,
+        allow_supervisor=False
+    )
 
     update_fields = data.model_dump(exclude_unset=True)
+    if (
+        "assigned_worker_id" in update_fields
+        and update_fields["assigned_worker_id"] != child.assigned_worker_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Worker assignment changes require an authorized transfer workflow."
+        )
+    if (
+        "village" in update_fields
+        and (update_fields["village"] or "").strip().casefold()
+        != (child.village or "").strip().casefold()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Changing a child's jurisdiction requires an authorized transfer workflow."
+        )
+    if current_user.role == "parent" and "priority_level" in update_fields:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Parents cannot change clinical priority."
+        )
     prev_values = {
         field: str(getattr(child, field, None))
         for field in update_fields.keys()
@@ -668,12 +986,7 @@ def get_child_vaccinations(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child not found.")
-
-    if current_user.role == "parent" and child.parent_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    child = get_authorized_child(child_id, current_user, db)
 
     return db.query(Vaccination).filter(
         Vaccination.child_id == child.id
@@ -691,22 +1004,34 @@ def schedule_vaccination(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child not found.")
+    child = get_authorized_child(
+        child_id,
+        current_user,
+        db,
+        allow_supervisor=False,
+        for_update=True
+    )
 
-    if current_user.role == "parent" and child.parent_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    normalized_name = data.vaccine_name.strip()
+    duplicate = db.query(Vaccination.id).filter(
+        Vaccination.child_id == child.id,
+        func.lower(func.trim(Vaccination.vaccine_name)) == normalized_name.casefold()
+    ).first()
+    if duplicate:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Dose '{normalized_name}' is already scheduled or recorded for this child."
+        )
 
     vaccination = Vaccination(
         child_id=child.id,
-        vaccine_name=data.vaccine_name.strip(),
+        vaccine_name=normalized_name,
         due_date=data.due_date,
         administered_date=None,
         completed=False
     )
     db.add(vaccination)
-    db.flush()
+    flush_vaccination_changes(db)
 
     record_audit_event(
         db=db,
@@ -719,7 +1044,7 @@ def schedule_vaccination(
         new_values={"vaccine_name": vaccination.vaccine_name, "due_date": str(vaccination.due_date)}
     )
 
-    db.commit()
+    commit_vaccination_changes(db)
     db.refresh(vaccination)
     return vaccination
 
@@ -734,9 +1059,15 @@ def complete_vaccination(
     current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
-    vaccination = db.query(Vaccination).filter(Vaccination.id == vaccination_id).first()
-    if not vaccination:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vaccination record not found.")
+    vaccination, child = get_authorized_child_record(
+        Vaccination,
+        vaccination_id,
+        "Vaccination record",
+        current_user,
+        db,
+        allow_supervisor=False,
+        for_update=True
+    )
 
     if vaccination.completed:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Vaccination already recorded as completed.")
@@ -753,7 +1084,7 @@ def complete_vaccination(
     vaccination.completed = True
     vaccination.batch_number = data.batch_number
     vaccination.facility = data.facility
-    vaccination.worker_name = data.worker_name or current_user.name
+    vaccination.worker_name = current_user.name
     vaccination.site = data.site
     vaccination.notes = data.notes
 
@@ -775,7 +1106,7 @@ def complete_vaccination(
         }
     )
 
-    db.commit()
+    commit_vaccination_changes(db)
     db.refresh(vaccination)
     return vaccination
 
@@ -791,30 +1122,35 @@ def record_administered_dose(
     current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child record not found.")
+    child = get_authorized_child(
+        child_id,
+        current_user,
+        db,
+        allow_supervisor=False,
+        for_update=True
+    )
 
     if data.administered_date > date.today():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Date cannot be in the future.")
 
     # Check for duplicate completed dose
+    normalized_name = data.vaccine_name.strip()
     existing = db.query(Vaccination).filter(
         Vaccination.child_id == child_id,
-        Vaccination.vaccine_name == data.vaccine_name.strip(),
+        func.lower(func.trim(Vaccination.vaccine_name)) == normalized_name.casefold(),
         Vaccination.completed.is_(True)
     ).first()
 
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Dose '{data.vaccine_name}' has already been recorded as completed for this child."
+            detail=f"Dose '{normalized_name}' has already been recorded as completed for this child."
         )
 
     # Check if an incomplete scheduled record exists, or create new
     scheduled = db.query(Vaccination).filter(
         Vaccination.child_id == child_id,
-        Vaccination.vaccine_name == data.vaccine_name.strip(),
+        func.lower(func.trim(Vaccination.vaccine_name)) == normalized_name.casefold(),
         Vaccination.completed.is_(False)
     ).first()
 
@@ -824,25 +1160,25 @@ def record_administered_dose(
         vaccination.completed = True
         vaccination.batch_number = data.batch
         vaccination.facility = data.facility
-        vaccination.worker_name = data.worker_name or current_user.name
+        vaccination.worker_name = current_user.name
         vaccination.site = data.site
         vaccination.notes = data.notes
     else:
         vaccination = Vaccination(
             child_id=child.id,
-            vaccine_name=data.vaccine_name.strip(),
+            vaccine_name=normalized_name,
             due_date=data.administered_date,
             administered_date=data.administered_date,
             completed=True,
             batch_number=data.batch,
             facility=data.facility,
-            worker_name=data.worker_name or current_user.name,
+            worker_name=current_user.name,
             site=data.site,
             notes=data.notes
         )
         db.add(vaccination)
 
-    db.flush()
+    flush_vaccination_changes(db)
     record_audit_event(
         db=db,
         user_id=current_user.id,
@@ -860,7 +1196,7 @@ def record_administered_dose(
         }
     )
 
-    db.commit()
+    commit_vaccination_changes(db)
     db.refresh(vaccination)
     return vaccination
 
@@ -878,11 +1214,7 @@ def get_child_milestones(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child not found.")
-    if current_user.role == "parent" and child.parent_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    child = get_authorized_child(child_id, current_user, db)
 
     return db.query(MilestoneRecord).filter(
         MilestoneRecord.child_id == child.id
@@ -900,12 +1232,12 @@ def add_milestone_observation(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child not found.")
-
-    if current_user.role == "parent" and child.parent_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    child = get_authorized_child(
+        child_id,
+        current_user,
+        db,
+        allow_supervisor=False
+    )
 
     if data.observation_date > date.today():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Observation date cannot be in future.")
@@ -919,6 +1251,23 @@ def add_milestone_observation(
         status=data.status
     )
     db.add(milestone)
+    db.flush()
+
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="RECORD_MILESTONE",
+        record_type="milestone",
+        record_id=milestone.id,
+        child_id=child.id,
+        fields_changed="observation_date,category,status",
+        new_values={
+            "observation_date": str(milestone.observation_date),
+            "category": milestone.category,
+            "status": milestone.status
+        }
+    )
+
     db.commit()
     db.refresh(milestone)
     return milestone
@@ -933,11 +1282,7 @@ def get_growth_records(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child not found.")
-    if current_user.role == "parent" and child.parent_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    child = get_authorized_child(child_id, current_user, db)
 
     return db.query(GrowthRecord).filter(
         GrowthRecord.child_id == child.id
@@ -955,9 +1300,12 @@ def record_growth(
     current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child not found.")
+    child = get_authorized_child(
+        child_id,
+        current_user,
+        db,
+        allow_supervisor=False
+    )
 
     if data.measurement_date > date.today():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Measurement date cannot be in future.")
@@ -1007,12 +1355,7 @@ def request_appointment(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child not found.")
-
-    if current_user.role == "parent" and child.parent_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    child = get_authorized_child(child_id, current_user, db)
 
     if data.appointment_date < date.today():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Appointment date cannot be in the past.")
@@ -1056,11 +1399,7 @@ def get_child_appointments(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child not found.")
-    if current_user.role == "parent" and child.parent_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    child = get_authorized_child(child_id, current_user, db)
 
     return db.query(Appointment).filter(
         Appointment.child_id == child.id
@@ -1085,6 +1424,13 @@ def get_upcoming_appointments(
         query = query.join(Child, Appointment.child_id == Child.id).filter(Child.parent_id == current_user.id)
     elif current_user.role == "worker":
         query = query.join(Child, Appointment.child_id == Child.id).filter(Child.assigned_worker_id == current_user.id)
+    elif current_user.role == "supervisor":
+        jurisdiction = get_supervisor_jurisdiction(current_user)
+        worker_ids = get_jurisdiction_worker_ids(db, jurisdiction)
+        child_ids = get_jurisdiction_child_ids(db, jurisdiction, worker_ids)
+        query = query.filter(Appointment.child_id.in_(child_ids) if child_ids else False)
+    else:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
     return query.order_by(Appointment.appointment_date).all()
 
@@ -1099,9 +1445,14 @@ def update_appointment_status(
     current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
-    apt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-    if not apt:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found.")
+    apt, _child = get_authorized_child_record(
+        Appointment,
+        appointment_id,
+        "Appointment",
+        current_user,
+        db,
+        allow_supervisor=False
+    )
 
     if apt.status in ("completed", "cancelled"):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Appointment is already finalized.")
@@ -1145,9 +1496,17 @@ def cancel_appointment(
     if not apt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found.")
 
-    # Authorization: parent who requested it, or authorized worker/supervisor
-    if current_user.role == "parent" and apt.requested_by != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot cancel another user's appointment.")
+    if current_user.role == "parent":
+        _child = get_authorized_child(apt.child_id, current_user, db, allow_supervisor=False)
+        if apt.requested_by != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot cancel another user's appointment.")
+    elif current_user.role == "worker":
+        _child = get_authorized_child(apt.child_id, current_user, db, allow_supervisor=False)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the requesting parent or assigned worker may cancel an appointment."
+        )
 
     if apt.status in ("completed", "cancelled"):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Appointment is already completed or cancelled.")
@@ -1183,9 +1542,12 @@ def create_follow_up(
     current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child not found.")
+    child = get_authorized_child(
+        child_id,
+        current_user,
+        db,
+        allow_supervisor=False
+    )
 
     if data.due_date < date.today():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Follow-up due date cannot be in past.")
@@ -1229,11 +1591,7 @@ def get_child_follow_ups(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child not found.")
-    if current_user.role == "parent" and child.parent_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    child = get_authorized_child(child_id, current_user, db)
 
     return db.query(FollowUp).filter(FollowUp.child_id == child.id).order_by(FollowUp.due_date).all()
 
@@ -1248,9 +1606,14 @@ def update_follow_up(
     current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
-    follow_up = db.query(FollowUp).filter(FollowUp.id == follow_up_id).first()
-    if not follow_up:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Follow-up not found.")
+    follow_up, _child = get_authorized_child_record(
+        FollowUp,
+        follow_up_id,
+        "Follow-up",
+        current_user,
+        db,
+        allow_supervisor=False
+    )
 
     prev_status = follow_up.status
     follow_up.status = data.status
@@ -2079,12 +2442,12 @@ def generate_child_qr_pass(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child record not found.")
-
-    if current_user.role == "parent" and child.parent_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    child = get_authorized_child(
+        child_id,
+        current_user,
+        db,
+        allow_supervisor=False
+    )
 
     # Invalidate previous tokens for this child
     db.query(QRTokenRecord).filter(
@@ -2107,6 +2470,17 @@ def generate_child_qr_pass(
         is_revoked=False
     )
     db.add(qr_record)
+    db.flush()
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="GENERATE_QR_PASS",
+        record_type="qr_token",
+        record_id=qr_record.id,
+        child_id=child.id,
+        fields_changed="expires_at",
+        new_values={"expires_at": expires_at.isoformat()}
+    )
     db.commit()
 
     return {
@@ -2117,6 +2491,23 @@ def generate_child_qr_pass(
     }
 
 
+def add_api_v1_aliases(app: FastAPI) -> None:
+    for route in list(app.router.routes):
+        path = getattr(route, "path", None)
+        if not path or path.startswith("/api/v1"):
+            continue
+
+        methods = list(getattr(route, "methods", []) or ["GET"])
+        if not methods:
+            continue
+
+        app.router.add_api_route(
+            path=f"/api/v1{path}",
+            endpoint=route.endpoint,
+            methods=methods,
+            response_model=getattr(route, "response_model", None),
+            status_code=getattr(route, "status_code", None),
+        )
 @app.get(
     "/records/lookup/{qr_token}",
     response_model=QRPublicResolverResponse
@@ -2229,6 +2620,9 @@ def send_communication(
     current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
+    if data.child_id is not None:
+        get_authorized_child(data.child_id, current_user, db, allow_supervisor=False)
+
     comm = Communication(
         sender_id=current_user.id,
         child_id=data.child_id,
@@ -2241,6 +2635,21 @@ def send_communication(
         sent_at=datetime.now(timezone.utc)
     )
     db.add(comm)
+    db.flush()
+    record_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action_type="SEND_COMMUNICATION",
+        record_type="communication",
+        record_id=comm.id,
+        child_id=comm.child_id,
+        fields_changed="message_type,channel,status",
+        new_values={
+            "message_type": comm.message_type,
+            "channel": comm.channel,
+            "status": comm.status
+        }
+    )
     db.commit()
     db.refresh(comm)
     return comm
@@ -2254,4 +2663,13 @@ def get_communications(
     current_user: User = Depends(require_role("worker")),
     db: Session = Depends(get_db)
 ):
-    return db.query(Communication).order_by(Communication.sent_at.desc()).limit(100).all()
+    assigned_child_ids = db.query(Child.id).filter(
+        Child.assigned_worker_id == current_user.id
+    )
+    return db.query(Communication).filter(
+        Communication.sender_id == current_user.id,
+        (Communication.child_id.is_(None) | Communication.child_id.in_(assigned_child_ids))
+    ).order_by(Communication.sent_at.desc()).limit(100).all()
+
+
+add_api_v1_aliases(app)

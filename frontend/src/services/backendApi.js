@@ -1,21 +1,32 @@
 /**
  * NavJyoti Unified Backend API Client
- * 
+ *
  * Implements complete REST API contracts matching FastAPI backend.
  * Provides resilient error handling, token injection, and configurable base URL.
  */
 
-const API_BASE_URL =
+const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
-  "http://127.0.0.1:8000";
+  "http://127.0.0.1:8000"
+)
+  .replace(/(?:\/api\/v1)+\/?$/i, "")
+  .replace(/\/+$/, "");
 
 const TOKEN_KEY = "navjyoti_access_token";
+
+export function apiUrl(endpoint) {
+  const normalizedEndpoint = endpoint
+    .replace(/^(?:\/api\/v1)+(?=\/|$)/i, "")
+    .replace(/^\/+/, "");
+  return `${API_BASE_URL}/${normalizedEndpoint}`;
+}
 
 /**
  * Universal JSON fetch helper with standard Authorization header injection.
  */
 async function request(endpoint, options = {}) {
-  const token = options.token || sessionStorage.getItem(TOKEN_KEY);
+  const { token: suppliedToken, ...fetchOptions } = options;
+  const token = suppliedToken || sessionStorage.getItem(TOKEN_KEY);
   const headers = {
     "Content-Type": "application/json",
     ...options.headers,
@@ -25,11 +36,11 @@ async function request(endpoint, options = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = apiUrl(endpoint);
   let response;
   try {
     response = await fetch(url, {
-      ...options,
+      ...fetchOptions,
       headers,
     });
   } catch (networkError) {
@@ -106,6 +117,16 @@ export const backendApi = {
 
   getProfile: (token) =>
     request("/auth/me", { token }),
+
+  chat: (token, message, options = {}) =>
+    request("/chat", {
+      method: "POST",
+      token,
+      body: JSON.stringify({
+        message,
+        language: options.language || "en",
+      }),
+    }),
 
   // Children Management
   getChildren: (token) =>

@@ -44,9 +44,11 @@ export function ChildDetailPage() {
   const [isSubmittingDose, setIsSubmittingDose] = useState(false);
   const [doseError, setDoseError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Follow-up notes editing
-  const child = childrenList.find((c) => String(c.id) === String(id)) || childrenList[0];
+  const child = childrenList.find((c) => String(c.id) === String(id));
   const [followUpText, setFollowUpText] = useState(child?.followUpNotes || '');
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [isSavingNotes, setIsSavingNotes] = useState(false);
@@ -121,12 +123,14 @@ export function ChildDetailPage() {
   const handleSaveNotes = async (e) => {
     e.preventDefault();
     setIsSavingNotes(true);
+    setErrorMsg('');
     try {
       await updateFollowUp(child.id, { notes: followUpText });
       setIsEditingNotes(false);
       setSuccessMsg('Field follow-up notes updated successfully.');
       setTimeout(() => setSuccessMsg(''), 3500);
     } catch (err) {
+      setErrorMsg(err.message || 'Unable to save follow-up notes.');
       setSuccessMsg('Error saving field notes: ' + (err.message || 'Server error'));
     } finally {
       setIsSavingNotes(false);
@@ -152,6 +156,11 @@ export function ChildDetailPage() {
           <div className="mb-4 p-3.5 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52] font-semibold flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-[#007F68] shrink-0" />
             <span>{successMsg}</span>
+          </div>
+        )}
+        {errorMsg && (
+          <div role="alert" className="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+            {errorMsg}
           </div>
         )}
 
@@ -501,7 +510,7 @@ export function ChildDetailPage() {
             )}
 
             <div className="p-3 rounded-xl bg-[#DDF0E3] border border-[#A8D5B5] text-xs text-[#005F52]">
-              <strong>Official Clinical Action:</strong> Recording this dose commits it to the child's permanent digital health pass and updates parental notifications.
+              <strong>Backend record:</strong> The connected API saves the administration date. Batch, facility, site, provider, and notes are not currently stored.
             </div>
 
             <div className="grid grid-cols-2 gap-3">

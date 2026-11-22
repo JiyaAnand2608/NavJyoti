@@ -13,27 +13,72 @@ import os
 import sys
 import unittest
 from datetime import date, datetime, timedelta, timezone
+from urllib.parse import urlparse
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 # Ensure backend path is on sys.path
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, backend_dir)
 
 os.environ.setdefault("JWT_SECRET_KEY", "navjyoti_postgres_e2e_secret_key_32_bytes_test_valid")
-os.environ.setdefault("ENVIRONMENT", "testing")
+os.environ["ENVIRONMENT"] = "testing"
+
+TEST_DATABASE_URL = os.getenv("NAVJYOTI_TEST_DATABASE_URL")
+if not TEST_DATABASE_URL:
+    raise unittest.SkipTest(
+        "Set NAVJYOTI_TEST_DATABASE_URL to an isolated PostgreSQL test database."
+    )
+if not TEST_DATABASE_URL.startswith(("postgresql://", "postgresql+psycopg://")):
+    raise RuntimeError("NAVJYOTI_TEST_DATABASE_URL must use PostgreSQL.")
+if "test" not in urlparse(TEST_DATABASE_URL).path.casefold():
+    raise RuntimeError("The isolated test database name must include 'test'.")
 
 from fastapi.testclient import TestClient
 import main
-from database import engine, SessionLocal, test_connection
 from models import Base, User, Child, Vaccination, GrowthRecord, MilestoneRecord, Appointment, FollowUp, OTPRecord, Notification, Communication, QRTokenRecord
 import otp_service
+original_test_connection = main.test_connection
+
+test_database_parts = urlparse(TEST_DATABASE_URL)
+application_database_url = os.getenv("DATABASE_URL")
+app_database_parts = urlparse(application_database_url) if application_database_url else None
+if app_database_parts and (
+    test_database_parts.hostname == app_database_parts.hostname
+    and test_database_parts.port == app_database_parts.port
+    and test_database_parts.path == app_database_parts.path
+):
+    raise RuntimeError("Refusing to run PostgreSQL tests against the application database.")
+
+test_engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+
+def override_get_db():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 class TestPostgreSQLEndToEnd(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Verify connection to PostgreSQL
-        assert test_connection(), "Must connect to live PostgreSQL database"
+        with test_engine.connect() as connection:
+            assert connection.execute(text("SELECT 1")).scalar() == 1
+        Base.metadata.create_all(bind=test_engine)
+        main.app.dependency_overrides[main.get_db] = override_get_db
+        main.test_connection = lambda: True
         cls.client = TestClient(main.app)
+
+    @classmethod
+    def tearDownClass(cls):
+        main.app.dependency_overrides.pop(main.get_db, None)
+        main.test_connection = original_test_connection
+        Base.metadata.drop_all(bind=test_engine)
+        test_engine.dispose()
 
     # --------------------------------------------------------------------------
     # 1. DATABASE CONNECTIVITY & HEALTH CHECKS
@@ -111,7 +156,7 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
         worker_name = "Rekha Devi (ANM)"
 
         # Seed staff worker in PostgreSQL
-        with SessionLocal() as db:
+        with TestingSessionLocal() as db:
             existing = db.query(User).filter(User.email == worker_email).first()
             if not existing:
                 worker = User(
@@ -127,7 +172,7 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
                 db.commit()
 
         # Clean existing test OTP records
-        with SessionLocal() as db:
+        with TestingSessionLocal() as db:
             db.query(OTPRecord).filter(OTPRecord.email == worker_email).delete()
             db.commit()
 
@@ -137,7 +182,7 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
         self.assertIn("verification code has been dispatched", req_res.json()["message"])
 
         # Check OTPRecord created in PostgreSQL
-        with SessionLocal() as db:
+        with TestingSessionLocal() as db:
             otp_rec = db.query(OTPRecord).filter(OTPRecord.email == worker_email, OTPRecord.is_used.is_(False)).first()
             self.assertIsNotNone(otp_rec)
             self.assertEqual(otp_rec.attempts, 0)
@@ -167,7 +212,7 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
         sup_email = "moic_sharma_test@navjyoti.gov.in"
 
         # Seed supervisor in PostgreSQL
-        with SessionLocal() as db:
+        with TestingSessionLocal() as db:
             existing = db.query(User).filter(User.email == sup_email).first()
             if not existing:
                 sup = User(
@@ -183,7 +228,7 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
                 db.commit()
 
         # Clean old OTPs
-        with SessionLocal() as db:
+        with TestingSessionLocal() as db:
             db.query(OTPRecord).filter(OTPRecord.email == sup_email).delete()
             db.commit()
 
@@ -192,7 +237,7 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
         self.assertEqual(req_res.status_code, 200)
 
         # Set known OTP
-        with SessionLocal() as db:
+        with TestingSessionLocal() as db:
             otp_rec = db.query(OTPRecord).filter(OTPRecord.email == sup_email, OTPRecord.is_used.is_(False)).first()
             self.assertIsNotNone(otp_rec)
             raw_otp = "654321"
@@ -283,11 +328,11 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
 
         # Worker logs in
         worker_email = "anm_rekha_test@navjyoti.gov.in"
-        with SessionLocal() as db:
+        with TestingSessionLocal() as db:
             db.query(OTPRecord).filter(OTPRecord.email == worker_email).delete()
             db.commit()
         self.client.post("/auth/otp/request", json={"email": worker_email, "role": "worker"})
-        with SessionLocal() as db:
+        with TestingSessionLocal() as db:
             otp_rec = db.query(OTPRecord).filter(OTPRecord.email == worker_email, OTPRecord.is_used.is_(False)).first()
             raw_otp = "998877"
             otp_rec.otp_hash = otp_service._hash_otp(raw_otp, worker_email)

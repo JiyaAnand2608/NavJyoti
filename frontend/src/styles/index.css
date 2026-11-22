@@ -131,3 +131,124 @@
   background-color: #FBF8F2;
   border: 1px solid #D8E6DA;
 }
+
+.kidzy-robot {
+  display: block;
+  width: 82px;
+  height: 90px;
+  overflow: visible;
+  filter: drop-shadow(0 5px 8px rgba(16, 51, 66, 0.12));
+}
+
+.kidzy-robot-compact {
+  width: 40px;
+  height: 46px;
+}
+
+.kidzy-robot-float {
+  transform-origin: center;
+  animation: kidzy-float 3.8s ease-in-out infinite;
+}
+
+.kidzy-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: kidzy-blink 5.8s ease-in-out infinite;
+}
+
+.kidzy-antenna-tip {
+  animation: kidzy-glow 2.8s ease-in-out infinite;
+}
+
+.kidzy-character-button {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: filter 180ms ease, transform 180ms ease;
+}
+
+.kidzy-character-button:hover {
+  filter: drop-shadow(0 0 12px rgba(0, 127, 104, 0.28));
+  transform: translateY(-2px) scale(1.03);
+}
+
+.kidzy-character-button:active {
+  transform: scale(0.94);
+}
+
+.kidzy-wave-arm {
+  transform-box: view-box;
+  transform-origin: 100px 60px;
+}
+
+.kidzy-robot-waving .kidzy-wave-arm {
+  animation: kidzy-wave 1.4s ease-in-out 2;
+}
+
+.kidzy-robot-responding .kidzy-robot-float {
+  animation: kidzy-respond 700ms ease-in-out infinite alternate;
+}
+
+.kidzy-greeting {
+  animation: kidzy-greeting-in 350ms ease-out both;
+}
+
+.kidzy-fullscreen {
+  border: 0;
+  border-radius: 0;
+}
+
+@media (max-width: 639px) {
+  .kidzy-fullscreen > header {
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+
+  .kidzy-fullscreen > div:last-child {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+
+@keyframes kidzy-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes kidzy-blink {
+  0%, 43%, 47%, 100% { transform: scaleY(1); }
+  45% { transform: scaleY(0.12); }
+}
+
+@keyframes kidzy-glow {
+  0%, 100% { filter: drop-shadow(0 0 1px #F4B83F); }
+  50% { filter: drop-shadow(0 0 6px #F4B83F); }
+}
+
+@keyframes kidzy-wave {
+  0%, 100% { transform: rotate(0); }
+  25%, 65% { transform: rotate(-24deg); }
+  45%, 85% { transform: rotate(9deg); }
+}
+
+@keyframes kidzy-respond {
+  from { transform: translateY(1px) scale(1); }
+  to { transform: translateY(-2px) scale(1.04); }
+}
+
+@keyframes kidzy-greeting-in {
+  from { opacity: 0; transform: translateY(5px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kidzy-robot-float,
+  .kidzy-eye,
+  .kidzy-antenna-tip,
+  .kidzy-robot-waving .kidzy-wave-arm,
+  .kidzy-robot-responding .kidzy-robot-float,
+  .kidzy-greeting {
+    animation: none;
+  }
+
+  .kidzy-character-button {
+    transition: none;
+  }
+}

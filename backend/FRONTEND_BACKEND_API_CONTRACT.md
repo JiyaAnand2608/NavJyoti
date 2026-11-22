@@ -1,12 +1,12 @@
 # NavJyoti — Frontend-to-Backend API Contract & Integration Specification
 
-**Platform:** NavJyoti — Child Development, Immunisation & Healthcare Support Platform  
-**Backend Framework:** FastAPI / PostgreSQL / SQLAlchemy 2.0  
-**Authentication Standard:** 
+**Platform:** NavJyoti — Child Development, Immunisation & Healthcare Support Platform<br>
+**Backend Framework:** FastAPI / PostgreSQL / SQLAlchemy 2.0<br>
+**Authentication Standard:**
 - **Parents/Caregivers:** Mobile Number (`+91XXXXXXXXXX`) + Password (Email is optional)
 - **Health Workers & Supervisors:** Registered Email + Secure 6-Digit One-Time Password (OTP) via Keyed HMAC-SHA256
 - **Existing Staff / Admin:** Optional Email + Password fallback compatibility
-**Security Standard:** Argon2 Password Hashing, Keyed HMAC-SHA256 OTP Hashes, Role-Based Access Control (RBAC)  
+**Security Standard:** Argon2 Password Hashing, Keyed HMAC-SHA256 OTP Hashes, Role-Based Access Control (RBAC)<br>
 
 ---
 
@@ -435,4 +435,3 @@ Authorization: Bearer <ACCESS_TOKEN>
   - `backend/tests/test_models.py` (5 tests): User & Child Relations, Clinical Vaccination & Growth Models, OTP Record Persistence, QR Token Records, Notifications & Communications.
   - `backend/tests/test_otp_service.py` (8 tests): Unknown Account Anti-Enumeration, Valid Dispatch, Cooldown Enforcement (HTTP 429), Verification Success, Failed Attempt Counting, Expired OTP Rejection, Role Mismatch Protection, Email Provider Failure Handling.
   - `backend/tests/test_phone_auth.py` (8 tests): Indian Mobile Number Normalization Variations, Invalid Mobile Format Rejections, Parent Phone+Password Registration, Duplicate Phone Rejection (HTTP 409), Parent Login via Phone & Password, Legacy Staff/Parent Email Compatibility, Multiple Null Email Persistence (PostgreSQL standard), Legacy Null-Phone Account Compatibility.
-

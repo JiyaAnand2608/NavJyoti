@@ -8,16 +8,88 @@ Verification Test for NavJyoti Demo Accounts:
 
 import sys
 from pathlib import Path
+from datetime import date
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from fastapi.testclient import TestClient
-from main import app
-from database import SessionLocal
-from models import User, Child
+import main
+from auth import hash_password
+from models import Base, Child, User
 
-client = TestClient(app)
+test_engine = create_engine(
+    "sqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+
+def override_get_db():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def isolated_demo_database():
+    Base.metadata.create_all(bind=test_engine)
+    db = TestingSessionLocal()
+    parent = User(
+        name="Sunita Sharma",
+        phone="+919876543210",
+        password_hash=hash_password("NavJyoti@123"),
+        role="parent",
+        village="Rampur",
+    )
+    worker = User(
+        name="Rekha Devi",
+        email="worker.demo@navjyoti.test",
+        worker_id="ANM-UP-BLS-4019",
+        password_hash=hash_password("NavJyoti@123"),
+        role="worker",
+        village="Rampur",
+        jurisdiction="Rampur",
+    )
+    supervisor = User(
+        name="Dr. Alok Verma",
+        email="supervisor.demo@navjyoti.test",
+        worker_id="MOIC-UP-BLS-1001",
+        password_hash=hash_password("NavJyoti@123"),
+        role="supervisor",
+        village="Rampur",
+        jurisdiction="Rampur",
+    )
+    db.add_all([parent, worker, supervisor])
+    db.flush()
+    db.add(
+        Child(
+            name="Aarav Sharma",
+            date_of_birth=date(2024, 3, 15),
+            parent_id=parent.id,
+            assigned_worker_id=worker.id,
+            village="Rampur",
+        )
+    )
+    db.commit()
+    db.close()
+    main.app.dependency_overrides[main.get_db] = override_get_db
+    yield
+    main.app.dependency_overrides.pop(main.get_db, None)
+    Base.metadata.drop_all(bind=test_engine)
+    test_engine.dispose()
+
+
+client = TestClient(main.app)
 
 def test_parent_demo_login():
     response = client.post("/auth/login", json={
@@ -101,9 +173,4 @@ def test_invalid_logins():
     print("PASS: Nonexistent email rejected (401)")
 
 if __name__ == "__main__":
-    print("=== RUNNING DEMO CREDENTIAL AUTHENTICATION TESTS ===")
-    test_parent_demo_login()
-    test_health_worker_demo_login()
-    test_supervisor_demo_login()
-    test_invalid_logins()
-    print("=== ALL DEMO CREDENTIAL AUTHENTICATION TESTS PASSED ===")
+    raise SystemExit(pytest.main([__file__]))

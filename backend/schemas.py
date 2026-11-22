@@ -34,6 +34,7 @@ class UserResponse(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     village: Optional[str] = None
+    jurisdiction: Optional[str] = None
     preferred_language: Optional[str] = "hi"
     worker_id: Optional[str] = None
     consent: Optional[bool] = True
@@ -53,6 +54,23 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     role: Optional[str] = None
     user: Optional[UserResponse] = None
+
+
+class ChatHistoryItem(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=1000)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    history: list[ChatHistoryItem] = Field(default_factory=list, max_length=12)
+    language: Literal["en", "hi"] = "en"
+    role: Literal["parent", "worker", "supervisor"] = "parent"
+    page: str = Field(default="", max_length=300)
+
+
+class ChatResponse(BaseModel):
+    reply: str
 
 
 # ==============================================================================
@@ -493,4 +511,3 @@ class SupervisorProfileResponse(BaseModel):
     village: Optional[str] = None
     supervised_workers_count: int
     supervised_children_count: int
-

@@ -216,6 +216,9 @@ class TestNavJyotiAPIIntegration(unittest.TestCase):
 
         db = TestingSessionLocal()
         child = db.query(Child).first()
+        worker = db.query(User).filter(User.email == "rekha.anm@navjyoti.gov.in").first()
+        child.assigned_worker_id = worker.id
+        db.commit()
         child_id = child.id
         db.close()
 
