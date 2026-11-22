@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 const ROLE_HOME_PATHS = {
   parent: '/parent/dashboard',
   worker: '/worker/dashboard',
-  supervisor: '/supervisor/analytics',
+  supervisor: '/supervisor/dashboard',
 };
 
 export function ProtectedRoute({ allowedRoles = [] }) {
@@ -30,7 +30,9 @@ export function ProtectedRoute({ allowedRoles = [] }) {
   // A session must contain both an authenticated state
   // and a user account returned by the authentication flow.
   if (!isAuthenticated || !user) {
-    const requiredRole = allowedRoles[0] || 'parent';
+    const isSupervisorRoute = allowedRoles.includes('supervisor');
+    const isWorkerRoute = allowedRoles.includes('worker');
+    const requiredRole = isSupervisorRoute ? 'supervisor' : isWorkerRoute ? 'worker' : 'parent';
     return (
       <Navigate
         to={`/auth/login?role=${requiredRole}`}

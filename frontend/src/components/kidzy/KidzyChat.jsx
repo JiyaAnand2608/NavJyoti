@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Maximize2, Minimize2, RotateCcw, Send, Trash2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { backendApi } from '../../services/backendApi';
-import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { KidzyRobot } from './KidzyRobot';
 
@@ -34,9 +33,7 @@ function loadHistory() {
 }
 
 export function KidzyChat() {
-  const { role } = useAuth();
   const { lang } = useLanguage();
-  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState(loadHistory);
   const [input, setInput] = useState('');
@@ -122,12 +119,7 @@ export function KidzyChat() {
     setLoading(true);
 
     try {
-      const data = await backendApi.chat(token, text, {
-        history: messages.slice(-12),
-        language: lang,
-        role: role || 'parent',
-        page: location.pathname,
-      });
+      const data = await backendApi.chat(token, text, { language: lang });
       setMessages((current) => [
         ...current,
         { role: 'assistant', content: data.reply },

@@ -14,7 +14,7 @@ export function RoleSelectionPage() {
     navigate(`/auth/login?role=${roleKey}`, {
       state: {
         role: roleKey,
-        from: roleKey === 'supervisor' ? '/supervisor/analytics' : roleKey === 'worker' ? '/worker/dashboard' : '/parent/dashboard',
+        from: roleKey === 'supervisor' ? '/supervisor/dashboard' : roleKey === 'worker' ? '/worker/dashboard' : '/parent/dashboard',
       },
     });
   };

@@ -123,6 +123,51 @@ const routeMetadata = [
     description: 'Manage worker credentials, assigned sub-centre details, and jurisdiction settings.',
   },
   {
+    pattern: /^\/supervisor\/dashboard/,
+    title: 'Authority Dashboard | NavJyoti',
+    description: 'Jurisdiction overview, active health workers, and coverage metrics.',
+  },
+  {
+    pattern: /^\/supervisor\/workers/,
+    title: 'Healthcare Workers Management | NavJyoti',
+    description: 'Monitor health worker performance and jurisdiction rosters.',
+  },
+  {
+    pattern: /^\/supervisor\/children/,
+    title: 'Child Healthcare Registry | NavJyoti',
+    description: 'Child immunisation oversight and jurisdiction records.',
+  },
+  {
+    pattern: /^\/supervisor\/vaccinations/,
+    title: 'Vaccination Monitoring | NavJyoti',
+    description: 'Vaccine coverage tracking and overdue child monitoring.',
+  },
+  {
+    pattern: /^\/supervisor\/follow-ups/,
+    title: 'Clinical Follow-Ups | NavJyoti',
+    description: 'Oversee high-risk children and adverse reaction follow-ups.',
+  },
+  {
+    pattern: /^\/supervisor\/audit-logs/,
+    title: 'Patient Record Audit Trail | NavJyoti',
+    description: 'Immutable record mutation history and worker activity audit.',
+  },
+  {
+    pattern: /^\/supervisor\/reports/,
+    title: 'Reports & Analytics | NavJyoti',
+    description: 'Aggregate healthcare statistics, worker metrics, and export data.',
+  },
+  {
+    pattern: /^\/supervisor\/alerts/,
+    title: 'Jurisdiction Alerts | NavJyoti',
+    description: 'Clinical escalation alerts and high priority follow-up flags.',
+  },
+  {
+    pattern: /^\/supervisor\/profile/,
+    title: 'Authority Profile & Settings | NavJyoti',
+    description: 'Supervisor jurisdiction configuration and credentials.',
+  },
+  {
     pattern: /^\/supervisor\/analytics/,
     title: 'Supervisor Coverage Analytics | NavJyoti',
     description: 'District and block-level immunisation indicators, cohort dropouts, and sector performance.',

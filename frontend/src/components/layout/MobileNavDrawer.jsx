@@ -19,6 +19,8 @@ import {
   MessageSquare,
   BarChart3,
   QrCode,
+  Users,
+  History,
 } from 'lucide-react';
 
 export function MobileNavDrawer({ isOpen, onClose }) {
@@ -28,8 +30,6 @@ export function MobileNavDrawer({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const currentRole = user?.role || role;
-  const isWorker = currentRole === 'worker';
-  const isSupervisor = currentRole === 'supervisor';
 
   const parentNav = [
     { name: "Dashboard", path: "/parent/dashboard", icon: LayoutDashboard },
@@ -55,18 +55,19 @@ export function MobileNavDrawer({ isOpen, onClose }) {
   ];
 
   const supervisorNav = [
-    { name: "Health Analytics", path: "/supervisor/analytics", icon: BarChart3 },
+    { name: "Dashboard", path: "/supervisor/dashboard", icon: LayoutDashboard },
+    { name: "Healthcare Workers", path: "/supervisor/workers", icon: Users },
+    { name: "Child Registry", path: "/supervisor/children", icon: ClipboardList },
+    { name: "Vaccination Monitoring", path: "/supervisor/vaccinations", icon: Syringe },
+    { name: "Follow-Ups", path: "/supervisor/follow-ups", icon: ShieldAlert },
+    { name: "Activity Logs", path: "/supervisor/audit-logs", icon: History },
+    { name: "Reports & Analytics", path: "/supervisor/reports", icon: BarChart3 },
+    { name: "Alerts", path: "/supervisor/alerts", icon: Bell },
+    { name: "Profile / Settings", path: "/supervisor/profile", icon: Settings },
   ];
-  const navItems = isSupervisor
-    ? supervisorNav
-    : isWorker
-      ? workerNav
-      : parentNav;
-  const homePath = isSupervisor
-    ? "/supervisor/analytics"
-    : isWorker
-      ? "/worker/dashboard"
-      : "/parent/dashboard";
+
+  const navItems = currentRole === 'supervisor' ? supervisorNav : currentRole === 'worker' ? workerNav : parentNav;
+  const homePath = currentRole === 'supervisor' ? "/supervisor/dashboard" : currentRole === 'worker' ? "/worker/dashboard" : "/parent/dashboard";
 
   const handleLogout = () => {
     logout();
@@ -97,7 +98,7 @@ export function MobileNavDrawer({ isOpen, onClose }) {
               <div>
                 <span className="font-bold text-base font-serif">NavJyoti</span>
                 <span className="block text-[10px] text-[#A8D5B5] font-semibold uppercase">
-                  {isSupervisor ? "Supervisor Portal" : isWorker ? "Worker Portal" : "Parent Portal"}
+                  {isWorker ? "Worker Portal" : "Parent Portal"}
                 </span>
               </div>
             </Link>
@@ -138,18 +139,18 @@ export function MobileNavDrawer({ isOpen, onClose }) {
           <button
             onClick={() => {
               onClose();
-              if (currentRole === 'parent') {
-                switchRole('worker');
-                navigate('/auth/login?role=worker', { state: { role: 'worker', from: '/worker/dashboard' } });
-              } else {
+              if (isWorker) {
                 switchRole('parent');
                 navigate('/auth/login?role=parent', { state: { role: 'parent', from: '/parent/dashboard' } });
+              } else {
+                switchRole('worker');
+                navigate('/auth/login?role=worker', { state: { role: 'worker', from: '/worker/dashboard' } });
               }
             }}
             className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-white/10 text-xs font-medium hover:bg-white/15 cursor-pointer text-white"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Switch to {currentRole === 'parent' ? 'Worker Portal' : 'Parent Portal'}</span>
+            <span>Switch to {isWorker ? 'Parent Portal' : 'Worker Portal'}</span>
           </button>
           <button
             onClick={handleLogout}
