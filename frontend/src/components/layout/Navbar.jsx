@@ -19,8 +19,6 @@ export function Navbar() {
       : role === 'worker'
       ? '/worker/dashboard'
       : '/parent/dashboard';
-      ? '/worker/dashboard'
-      : '/parent/dashboard';
   const isHome = location.pathname === '/';
 
   return (
