@@ -9,6 +9,7 @@ Verifies full operational integrity against the real PostgreSQL database:
 - Supervisor analytics calculated directly from PostgreSQL records
 """
 
+import json
 import os
 import sys
 import unittest
@@ -37,7 +38,7 @@ if "test" not in urlparse(TEST_DATABASE_URL).path.casefold():
 
 from fastapi.testclient import TestClient
 import main
-from models import Base, User, Child, Vaccination, GrowthRecord, MilestoneRecord, Appointment, FollowUp, OTPRecord, Notification, Communication, QRTokenRecord
+from models import Base, User, Child, Vaccination, GrowthRecord, MilestoneRecord, Appointment, FollowUp, OTPRecord, Notification, Communication, QRTokenRecord, AuditLog
 import otp_service
 original_test_connection = main.test_connection
 
@@ -64,6 +65,29 @@ def override_get_db():
 
 
 class TestPostgreSQLEndToEnd(unittest.TestCase):
+    @classmethod
+    def ensure_test_worker(cls):
+        worker_email = "anm_rekha_test@navjyoti.gov.in"
+        with TestingSessionLocal() as db:
+            worker = db.query(User).filter(User.email == worker_email).first()
+            if not worker:
+                worker = User(
+                    name="Rekha Devi (ANM)",
+                    email=worker_email,
+                    password_hash="argon2_hashed_placeholder",
+                    role="worker",
+                    worker_id="ANM-UP-BLS-01",
+                    consent=True
+                )
+            worker.name = "Rekha Devi (ANM)"
+            worker.role = "worker"
+            worker.worker_id = "ANM-UP-BLS-01"
+            worker.village = "Rampur"
+            worker.consent = True
+            db.add(worker)
+            db.commit()
+            return worker.id
+
     @classmethod
     def setUpClass(cls):
         with test_engine.connect() as connection:
@@ -156,20 +180,7 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
         worker_name = "Rekha Devi (ANM)"
 
         # Seed staff worker in PostgreSQL
-        with TestingSessionLocal() as db:
-            existing = db.query(User).filter(User.email == worker_email).first()
-            if not existing:
-                worker = User(
-                    name=worker_name,
-                    email=worker_email,
-                    password_hash="argon2_hashed_placeholder",
-                    role="worker",
-                    worker_id="ANM-UP-BLS-01",
-                    village="Bilaspur Sadar",
-                    consent=True
-                )
-                db.add(worker)
-                db.commit()
+        self.ensure_test_worker()
 
         # Clean existing test OTP records
         with TestingSessionLocal() as db:
@@ -210,6 +221,7 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
     def test_05_supervisor_otp_and_access_control(self):
         """Test supervisor OTP login and authorization."""
         sup_email = "moic_sharma_test@navjyoti.gov.in"
+        jurisdiction = "Rampur"
 
         # Seed supervisor in PostgreSQL
         with TestingSessionLocal() as db:
@@ -221,11 +233,14 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
                     password_hash="argon2_hashed_placeholder",
                     role="supervisor",
                     worker_id="MOIC-UP-BLS-01",
-                    village="Bilaspur District",
+                    village=jurisdiction,
+                    jurisdiction=jurisdiction,
                     consent=True
                 )
                 db.add(sup)
-                db.commit()
+            else:
+                existing.jurisdiction = jurisdiction
+            db.commit()
 
         # Clean old OTPs
         with TestingSessionLocal() as db:
@@ -255,7 +270,7 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
 
         # Supervisor can access analytics dashboard
         analytics_res = self.client.get("/supervisor/dashboard", headers={"Authorization": f"Bearer {sup_token}"})
-        self.assertEqual(analytics_res.status_code, 200)
+        self.assertEqual(analytics_res.status_code, 200, analytics_res.text)
         analytics_data = analytics_res.json()
         self.assertIn("total_children", analytics_data)
         self.assertIn("total_vaccinations", analytics_data)
@@ -308,6 +323,54 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
         child_id = child_data["id"]
         self.assertEqual(child_data["name"], "Aarav Sharma")
 
+        with TestingSessionLocal() as db:
+            child_audit = db.query(AuditLog).filter(
+                AuditLog.action_type == "CREATE_CHILD",
+                AuditLog.record_id == child_id,
+            ).one()
+            self.assertEqual(child_audit.user_id, child_data["parent_id"])
+            self.assertEqual(child_audit.child_id, child_id)
+            self.assertEqual(child_audit.record_type, "child")
+            self.assertEqual(
+                json.loads(child_audit.new_values),
+                {"gender": "Male", "blood_group": "O+", "birth_weight_kg": 3.2},
+            )
+            parent_id = child_data["parent_id"]
+            create_audit_count = db.query(AuditLog).filter(
+                AuditLog.action_type == "CREATE_CHILD",
+                AuditLog.user_id == parent_id,
+            ).count()
+
+        original_recorder = main.record_audit_event
+
+        def fail_audit(**_kwargs):
+            raise RuntimeError("simulated audit failure")
+
+        main.record_audit_event = fail_audit
+        try:
+            with self.assertRaisesRegex(RuntimeError, "simulated audit failure"):
+                self.client.post("/children", headers=p_headers, json={
+                    "name": "Audit Rollback Child",
+                    "date_of_birth": "2025-01-01",
+                    "gender": "Female",
+                    "village": "Rampur",
+                })
+        finally:
+            main.record_audit_event = original_recorder
+
+        with TestingSessionLocal() as db:
+            self.assertIsNone(db.query(Child).filter(
+                Child.parent_id == parent_id,
+                Child.name == "Audit Rollback Child",
+            ).first())
+            self.assertEqual(
+                db.query(AuditLog).filter(
+                    AuditLog.action_type == "CREATE_CHILD",
+                    AuditLog.user_id == parent_id,
+                ).count(),
+                create_audit_count,
+            )
+
         # Step 2: Parent schedules a vaccination dose
         sched_res = self.client.post(
             f"/children/{child_id}/vaccinations",
@@ -328,19 +391,31 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
 
         # Worker logs in
         worker_email = "anm_rekha_test@navjyoti.gov.in"
+        worker_id = self.ensure_test_worker()
         with TestingSessionLocal() as db:
             db.query(OTPRecord).filter(OTPRecord.email == worker_email).delete()
             db.commit()
-        self.client.post("/auth/otp/request", json={"email": worker_email, "role": "worker"})
+        otp_req_res = self.client.post("/auth/otp/request", json={"email": worker_email, "role": "worker"})
+        self.assertEqual(otp_req_res.status_code, 200, otp_req_res.text)
         with TestingSessionLocal() as db:
             otp_rec = db.query(OTPRecord).filter(OTPRecord.email == worker_email, OTPRecord.is_used.is_(False)).first()
+            self.assertIsNotNone(otp_rec)
             raw_otp = "998877"
             otp_rec.otp_hash = otp_service._hash_otp(raw_otp, worker_email)
             db.commit()
 
         w_res = self.client.post("/auth/otp/verify", json={"email": worker_email, "role": "worker", "otp": "998877"})
+        self.assertEqual(w_res.status_code, 200, w_res.text)
+        self.assertEqual(w_res.json()["user"]["id"], worker_id)
         w_token = w_res.json()["access_token"]
         w_headers = {"Authorization": f"Bearer {w_token}"}
+
+        # Seed the existing assignment in the isolated DB; the API intentionally has no transfer endpoint.
+        with TestingSessionLocal() as db:
+            child = db.query(Child).filter(Child.id == child_id).first()
+            self.assertIsNotNone(child)
+            child.assigned_worker_id = worker_id
+            db.commit()
 
         # Step 3: Worker records dose administration
         admin_res = self.client.patch(f"/worker/vaccinations/{vax_id}/complete", headers=w_headers, json={
@@ -351,10 +426,57 @@ class TestPostgreSQLEndToEnd(unittest.TestCase):
             "site": "Left Upper Arm",
             "notes": "Administered without adverse reaction."
         })
-        self.assertEqual(admin_res.status_code, 200)
+        self.assertEqual(admin_res.status_code, 200, admin_res.text)
         admin_data = admin_res.json()
         self.assertTrue(admin_data["completed"])
         self.assertEqual(admin_data["batch_number"], "BCG-2026-99A")
+
+        with TestingSessionLocal() as db:
+            vaccination_audit = db.query(AuditLog).filter(
+                AuditLog.action_type == "COMPLETE_VACCINATION",
+                AuditLog.record_id == vax_id,
+            ).one()
+            self.assertEqual(vaccination_audit.user_id, worker_id)
+            self.assertEqual(vaccination_audit.child_id, child_id)
+            self.assertEqual(vaccination_audit.record_type, "vaccination")
+            self.assertEqual(
+                json.loads(vaccination_audit.new_values),
+                {
+                    "completed": True,
+                    "administered_date": "2025-06-16",
+                    "batch_number": "BCG-2026-99A",
+                    "facility": "Rampur Sub-Centre",
+                },
+            )
+
+        rollback_vax_res = self.client.post(
+            f"/children/{child_id}/vaccinations",
+            headers=p_headers,
+            json={"vaccine_name": "Audit Rollback Dose", "due_date": "2025-06-15"},
+        )
+        self.assertEqual(rollback_vax_res.status_code, 201, rollback_vax_res.text)
+        rollback_vax_id = rollback_vax_res.json()["id"]
+
+        main.record_audit_event = fail_audit
+        try:
+            with self.assertRaisesRegex(RuntimeError, "simulated audit failure"):
+                self.client.patch(
+                    f"/worker/vaccinations/{rollback_vax_id}/complete",
+                    headers=w_headers,
+                    json={"administered_date": "2025-06-16", "batch_number": "ROLLBACK-001"},
+                )
+        finally:
+            main.record_audit_event = original_recorder
+
+        with TestingSessionLocal() as db:
+            rolled_back_vaccination = db.get(Vaccination, rollback_vax_id)
+            self.assertFalse(rolled_back_vaccination.completed)
+            self.assertIsNone(rolled_back_vaccination.administered_date)
+            self.assertIsNone(rolled_back_vaccination.batch_number)
+            self.assertIsNone(db.query(AuditLog).filter(
+                AuditLog.action_type == "COMPLETE_VACCINATION",
+                AuditLog.record_id == rollback_vax_id,
+            ).first())
 
         # Step 4: Worker records growth measurement
         growth_res = self.client.post(f"/children/{child_id}/growth", headers=w_headers, json={

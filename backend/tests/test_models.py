@@ -177,6 +177,25 @@ class TestModels(unittest.TestCase):
         self.assertIsNotNone(qr.id)
         self.assertFalse(qr.is_revoked)
 
+    def test_auth_feature_delete_policies_match_migration(self):
+        """Verify new-table foreign keys retain migration 002 delete semantics."""
+        self.assertEqual(
+            next(iter(Notification.__table__.c.user_id.foreign_keys)).ondelete,
+            "CASCADE",
+        )
+        self.assertEqual(
+            next(iter(Notification.__table__.c.child_id.foreign_keys)).ondelete,
+            "SET NULL",
+        )
+        self.assertEqual(
+            next(iter(Communication.__table__.c.child_id.foreign_keys)).ondelete,
+            "SET NULL",
+        )
+        self.assertEqual(
+            next(iter(QRTokenRecord.__table__.c.child_id.foreign_keys)).ondelete,
+            "CASCADE",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
