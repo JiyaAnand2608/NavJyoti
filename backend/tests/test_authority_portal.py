@@ -439,6 +439,145 @@ class TestAuthorityPortal(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 409)
 
+    def test_15_worker_can_update_assigned_vaccination_with_audit_log(self):
+        db = TestingSessionLocal()
+        vaccination = Vaccination(
+            child_id=self.child_rampur_id,
+            vaccine_name="Assigned Test Dose",
+            due_date=date.today(),
+            completed=False,
+        )
+        db.add(vaccination)
+        db.commit()
+        vaccination_id = vaccination.id
+        db.close()
+
+        response = self.client.patch(
+            f"/worker/vaccinations/{vaccination_id}/complete",
+            json={
+                "administered_date": date.today().isoformat(),
+                "batch_number": "TEST-001",
+                "facility": "Rampur Subcentre",
+            },
+            headers={"Authorization": f"Bearer {self.worker_token}"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["completed"])
+
+        db = TestingSessionLocal()
+        updated_vaccination = db.get(Vaccination, vaccination_id)
+        audit_log = db.query(AuditLog).filter(
+            AuditLog.record_id == vaccination_id,
+            AuditLog.action_type == "COMPLETE_VACCINATION",
+        ).one()
+        self.assertTrue(updated_vaccination.completed)
+        self.assertEqual(audit_log.child_id, self.child_rampur_id)
+        self.assertEqual(audit_log.user_id, self.worker_rampur_id)
+        db.close()
+
+    def test_16_worker_cannot_update_another_workers_vaccination(self):
+        db = TestingSessionLocal()
+        vaccination = Vaccination(
+            child_id=self.child_bilaspur_id,
+            vaccine_name="Other Worker Test Dose",
+            due_date=date.today(),
+            completed=False,
+        )
+        db.add(vaccination)
+        db.commit()
+        vaccination_id = vaccination.id
+        db.close()
+
+        headers = {"Authorization": f"Bearer {self.worker_token}"}
+        complete_response = self.client.patch(
+            f"/worker/vaccinations/{vaccination_id}/complete",
+            json={"administered_date": date.today().isoformat()},
+            headers=headers,
+        )
+        administer_response = self.client.post(
+            f"/worker/vaccinations/administer?child_id={self.child_bilaspur_id}",
+            json={
+                "vaccine_name": "Other Worker New Dose",
+                "administered_date": date.today().isoformat(),
+            },
+            headers=headers,
+        )
+
+        self.assertEqual(complete_response.status_code, 403)
+        self.assertEqual(administer_response.status_code, 403)
+
+    def test_17_parent_cannot_use_worker_vaccination_endpoints(self):
+        db = TestingSessionLocal()
+        vaccination = Vaccination(
+            child_id=self.child_rampur_id,
+            vaccine_name="Parent Authorization Test Dose",
+            due_date=date.today(),
+            completed=False,
+        )
+        db.add(vaccination)
+        db.commit()
+        vaccination_id = vaccination.id
+        db.close()
+
+        headers = {"Authorization": f"Bearer {self.parent_token}"}
+        complete_response = self.client.patch(
+            f"/worker/vaccinations/{vaccination_id}/complete",
+            json={"administered_date": date.today().isoformat()},
+            headers=headers,
+        )
+        administer_response = self.client.post(
+            f"/worker/vaccinations/administer?child_id={self.child_rampur_id}",
+            json={
+                "vaccine_name": "Parent Unauthorized Dose",
+                "administered_date": date.today().isoformat(),
+            },
+            headers=headers,
+        )
+
+        self.assertEqual(complete_response.status_code, 403)
+        self.assertEqual(administer_response.status_code, 403)
+
+    def test_18_vaccination_update_rolls_back_when_audit_recording_fails(self):
+        db = TestingSessionLocal()
+        vaccination = Vaccination(
+            child_id=self.child_rampur_id,
+            vaccine_name="Atomicity Test Dose",
+            due_date=date.today(),
+            completed=False,
+        )
+        db.add(vaccination)
+        db.commit()
+        vaccination_id = vaccination.id
+        db.close()
+
+        original_recorder = main.record_audit_event
+
+        def fail_audit(**_kwargs):
+            raise RuntimeError("simulated audit failure")
+
+        main.record_audit_event = fail_audit
+        try:
+            with self.assertRaises(RuntimeError):
+                self.client.patch(
+                    f"/worker/vaccinations/{vaccination_id}/complete",
+                    json={"administered_date": date.today().isoformat()},
+                    headers={"Authorization": f"Bearer {self.worker_token}"},
+                )
+        finally:
+            main.record_audit_event = original_recorder
+
+        db = TestingSessionLocal()
+        unchanged_vaccination = db.get(Vaccination, vaccination_id)
+        audit_log = db.query(AuditLog).filter(
+            AuditLog.record_id == vaccination_id,
+            AuditLog.action_type == "COMPLETE_VACCINATION",
+        ).first()
+        self.assertFalse(unchanged_vaccination.completed)
+        self.assertIsNone(unchanged_vaccination.administered_date)
+        self.assertIsNone(audit_log)
+        db.close()
+
 
 if __name__ == "__main__":
     unittest.main()

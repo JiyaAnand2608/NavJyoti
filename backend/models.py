@@ -291,8 +291,8 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    child_id = Column(Integer, ForeignKey("children.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    child_id = Column(Integer, ForeignKey("children.id", ondelete="SET NULL"), nullable=True)
     title = Column(String(150), nullable=False)
     message = Column(String(500), nullable=False)
     type = Column(String(50), default="info", nullable=False)
@@ -311,7 +311,7 @@ class Communication(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    child_id = Column(Integer, ForeignKey("children.id"), nullable=True)
+    child_id = Column(Integer, ForeignKey("children.id", ondelete="SET NULL"), nullable=True)
     recipient_name = Column(String(100), nullable=False)
     recipient_phone = Column(String(20), nullable=False)
     message_type = Column(String(50), default="reminder", nullable=False)
@@ -329,7 +329,7 @@ class QRTokenRecord(Base):
     __tablename__ = "qr_token_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    child_id = Column(Integer, ForeignKey("children.id"), nullable=False, index=True)
+    child_id = Column(Integer, ForeignKey("children.id", ondelete="CASCADE"), nullable=False, index=True)
     token_hash = Column(String(255), unique=True, nullable=False, index=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False)
